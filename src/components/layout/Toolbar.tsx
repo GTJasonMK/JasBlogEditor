@@ -3,7 +3,8 @@ import { useSettingsStore, useFileStore, useEditorStore } from '@/store';
 import { openFolderDialog } from '@/platform/tauri';
 import type { ContentType } from '@/types';
 
-const CONTENT_TYPE_LABELS: Record<ContentType, string> = {
+// JasBlog 模式下的内容类型标签
+const JASBLOG_TYPE_LABELS: Record<string, string> = {
   note: '笔记',
   project: '项目',
   roadmap: '规划',
@@ -11,11 +12,13 @@ const CONTENT_TYPE_LABELS: Record<ContentType, string> = {
 };
 
 export function Toolbar() {
-  const { settings, setWorkspacePath, error: settingsError, clearError: clearSettingsError } = useSettingsStore();
-  const { refreshFileTree } = useFileStore();
+  const { settings, setWorkspacePath, setWorkspaceType, error: settingsError, clearError: clearSettingsError } = useSettingsStore();
+  const { workspaceType, refreshFileTree, detectWorkspaceType, setWorkspaceType: setFileStoreWorkspaceType } = useFileStore();
   const { currentFile, saveFile, viewMode, setViewMode, isLoading, toggleMiniMode, error: editorError, clearError: clearEditorError } = useEditorStore();
   const [showNewMenu, setShowNewMenu] = useState(false);
-  const [showNewDialog, setShowNewDialog] = useState<ContentType | null>(null);
+  const [showNewDialog, setShowNewDialog] = useState<Exclude<ContentType, 'doc'> | null>(null);
+  const [showDocDialog, setShowDocDialog] = useState(false);
+  const [showFolderDialog, setShowFolderDialog] = useState(false);
   const [newFilename, setNewFilename] = useState('');
   const [localError, setLocalError] = useState<string | null>(null);
 
@@ -37,11 +40,17 @@ export function Toolbar() {
   const handleSelectWorkspace = async () => {
     try {
       const path = await openFolderDialog({
-        title: '选择 JasBlog 项目目录',
+        title: '选择工作区目录',
       });
       if (path) {
         await setWorkspacePath(path);
         useFileStore.getState().setWorkspacePath(path);
+
+        // 自动检测工作区类型
+        const detectedType = await detectWorkspaceType();
+        setFileStoreWorkspaceType(detectedType);
+        await setWorkspaceType(detectedType);
+
         await refreshFileTree();
       }
     } catch (error) {
@@ -61,10 +70,55 @@ export function Toolbar() {
     }
   };
 
-  const handleNewFile = (type: ContentType) => {
+  const handleNewFile = (type: Exclude<ContentType, 'doc'>) => {
     setShowNewMenu(false);
     setShowNewDialog(type);
     setNewFilename('');
+  };
+
+  const handleNewDoc = () => {
+    setShowNewMenu(false);
+    setShowDocDialog(true);
+    setNewFilename('');
+  };
+
+  const handleNewFolder = () => {
+    setShowNewMenu(false);
+    setShowFolderDialog(true);
+    setNewFilename('');
+  };
+
+  const handleCreateDoc = async () => {
+    if (!newFilename.trim() || !settings.workspacePath) return;
+
+    try {
+      const { createDocFile, openFile } = useEditorStore.getState();
+      const path = await createDocFile(settings.workspacePath, newFilename.trim());
+      await openFile(path, 'doc');
+      await refreshFileTree();
+      setShowDocDialog(false);
+      setNewFilename('');
+    } catch (error) {
+      // 错误已在 store 中处理
+      setShowDocDialog(false);
+      setNewFilename('');
+    }
+  };
+
+  const handleCreateFolder = async () => {
+    if (!newFilename.trim() || !settings.workspacePath) return;
+
+    try {
+      const { createFolder } = useEditorStore.getState();
+      await createFolder(settings.workspacePath, newFilename.trim());
+      await refreshFileTree();
+      setShowFolderDialog(false);
+      setNewFilename('');
+    } catch (error) {
+      setLocalError(`创建文件夹失败: ${error}`);
+      setShowFolderDialog(false);
+      setNewFilename('');
+    }
   };
 
   const handleCreateFile = async () => {
@@ -137,15 +191,40 @@ export function Toolbar() {
 
         {showNewMenu && (
           <div className="absolute top-full left-0 mt-1 bg-white border border-[var(--color-border)] rounded-md shadow-lg py-1 z-50 min-w-[120px]">
-            {(['note', 'project', 'roadmap', 'graph'] as ContentType[]).map((type) => (
-              <button
-                key={type}
-                onClick={() => handleNewFile(type)}
-                className="w-full px-4 py-2 text-sm text-left hover:bg-[var(--color-surface)] transition-colors"
-              >
-                {CONTENT_TYPE_LABELS[type]}
-              </button>
-            ))}
+            {workspaceType === 'jasblog' ? (
+              // JasBlog 模式: 显示内容类型选项
+              (['note', 'project', 'roadmap', 'graph'] as Exclude<ContentType, 'doc'>[]).map((type) => (
+                <button
+                  key={type}
+                  onClick={() => handleNewFile(type)}
+                  className="w-full px-4 py-2 text-sm text-left hover:bg-[var(--color-surface)] transition-colors"
+                >
+                  {JASBLOG_TYPE_LABELS[type]}
+                </button>
+              ))
+            ) : (
+              // 普通文档模式: 显示新建文档和新建文件夹
+              <>
+                <button
+                  onClick={handleNewDoc}
+                  className="w-full px-4 py-2 text-sm text-left hover:bg-[var(--color-surface)] transition-colors flex items-center gap-2"
+                >
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                  </svg>
+                  新建文档
+                </button>
+                <button
+                  onClick={handleNewFolder}
+                  className="w-full px-4 py-2 text-sm text-left hover:bg-[var(--color-surface)] transition-colors flex items-center gap-2"
+                >
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 13h6m-3-3v6m-9 1V7a2 2 0 012-2h6l2 2h6a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2z" />
+                  </svg>
+                  新建文件夹
+                </button>
+              </>
+            )}
           </div>
         )}
       </div>
@@ -217,11 +296,11 @@ export function Toolbar() {
         </div>
       )}
 
-      {/* 新建文件对话框 */}
+      {/* 新建文件对话框 (JasBlog 模式) */}
       {showNewDialog && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
           <div className="bg-white rounded-lg p-6 w-[400px] shadow-xl">
-            <h3 className="text-lg font-medium mb-4">新建{CONTENT_TYPE_LABELS[showNewDialog]}</h3>
+            <h3 className="text-lg font-medium mb-4">新建{JASBLOG_TYPE_LABELS[showNewDialog]}</h3>
             <input
               type="text"
               value={newFilename}
@@ -243,6 +322,84 @@ export function Toolbar() {
               </button>
               <button
                 onClick={handleCreateFile}
+                disabled={!newFilename.trim()}
+                className="px-4 py-2 text-sm bg-[var(--color-primary)] text-white hover:bg-[var(--color-primary-dark)] disabled:opacity-50 rounded-md transition-colors"
+              >
+                创建
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 新建文档对话框 (普通文档模式) */}
+      {showDocDialog && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg p-6 w-[400px] shadow-xl">
+            <h3 className="text-lg font-medium mb-4">新建文档</h3>
+            <input
+              type="text"
+              value={newFilename}
+              onChange={(e) => setNewFilename(e.target.value)}
+              placeholder="请输入文件路径（如: notes/daily.md 或 README）"
+              className="w-full px-3 py-2 border border-[var(--color-border)] rounded-md focus:outline-none focus:border-[var(--color-primary)] mb-2"
+              autoFocus
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') handleCreateDoc();
+                if (e.key === 'Escape') setShowDocDialog(false);
+              }}
+            />
+            <p className="text-xs text-[var(--color-text-muted)] mb-4">
+              支持相对路径，目录不存在时将自动创建。扩展名可省略（默认 .md）
+            </p>
+            <div className="flex justify-end gap-2">
+              <button
+                onClick={() => setShowDocDialog(false)}
+                className="px-4 py-2 text-sm text-[var(--color-text-muted)] hover:bg-[var(--color-surface)] rounded-md transition-colors"
+              >
+                取消
+              </button>
+              <button
+                onClick={handleCreateDoc}
+                disabled={!newFilename.trim()}
+                className="px-4 py-2 text-sm bg-[var(--color-primary)] text-white hover:bg-[var(--color-primary-dark)] disabled:opacity-50 rounded-md transition-colors"
+              >
+                创建
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 新建文件夹对话框 (普通文档模式) */}
+      {showFolderDialog && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg p-6 w-[400px] shadow-xl">
+            <h3 className="text-lg font-medium mb-4">新建文件夹</h3>
+            <input
+              type="text"
+              value={newFilename}
+              onChange={(e) => setNewFilename(e.target.value)}
+              placeholder="请输入文件夹路径（如: docs/guides）"
+              className="w-full px-3 py-2 border border-[var(--color-border)] rounded-md focus:outline-none focus:border-[var(--color-primary)] mb-2"
+              autoFocus
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') handleCreateFolder();
+                if (e.key === 'Escape') setShowFolderDialog(false);
+              }}
+            />
+            <p className="text-xs text-[var(--color-text-muted)] mb-4">
+              支持嵌套路径，父目录不存在时将自动创建
+            </p>
+            <div className="flex justify-end gap-2">
+              <button
+                onClick={() => setShowFolderDialog(false)}
+                className="px-4 py-2 text-sm text-[var(--color-text-muted)] hover:bg-[var(--color-surface)] rounded-md transition-colors"
+              >
+                取消
+              </button>
+              <button
+                onClick={handleCreateFolder}
                 disabled={!newFilename.trim()}
                 className="px-4 py-2 text-sm bg-[var(--color-primary)] text-white hover:bg-[var(--color-primary-dark)] disabled:opacity-50 rounded-md transition-colors"
               >

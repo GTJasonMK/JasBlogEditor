@@ -1,9 +1,9 @@
 import { create } from 'zustand';
 import { invokeTauri, getWindowState, setMiniModeWindow, restoreNormalWindow, getCurrentMiniModeSettings } from '@/platform/tauri';
-import { parseMarkdownContent, serializeMarkdownContent, parseJsonContent, serializeJsonContent } from '@/services/contentParser';
-import type { ContentType, EditorFile, NoteMetadata, ProjectMetadata, RoadmapMetadata, GraphData, WindowState } from '@/types';
+import { parseMarkdownContent, serializeMarkdownContent, parseJsonContent, serializeJsonContent, serializeDocContent } from '@/services/contentParser';
+import type { ContentType, EditorFile, NoteMetadata, ProjectMetadata, RoadmapMetadata, GraphData, DocMetadata, WindowState } from '@/types';
 
-type Metadata = NoteMetadata | ProjectMetadata | RoadmapMetadata | GraphData;
+type Metadata = NoteMetadata | ProjectMetadata | RoadmapMetadata | GraphData | DocMetadata;
 
 // 迷你模式默认配置
 const DEFAULT_MINI_MODE = { width: 450, height: 350 };
@@ -21,7 +21,9 @@ interface EditorState {
   updateContent: (content: string) => void;
   updateMetadata: (metadata: Partial<Metadata>) => void;
   saveFile: () => Promise<void>;
-  createNewFile: (workspacePath: string, type: ContentType, filename: string) => Promise<string>;
+  createNewFile: (workspacePath: string, type: Exclude<ContentType, 'doc'>, filename: string) => Promise<string>;
+  createDocFile: (workspacePath: string, relativePath: string) => Promise<string>;
+  createFolder: (workspacePath: string, relativePath: string) => Promise<void>;
   deleteCurrentFile: () => Promise<void>;
   setViewMode: (mode: 'edit' | 'preview' | 'split') => void;
   clearError: () => void;
@@ -47,15 +49,18 @@ export const useEditorStore = create<EditorState>((set, get) => ({
 
       let metadata: Metadata;
       let bodyContent: string;
+      let hasFrontmatter = true;
 
       if (type === 'graph') {
         const parsed = parseJsonContent(content);
         metadata = parsed;
         bodyContent = content;
       } else {
+        // note, project, roadmap, doc 都使用 Markdown 解析
         const parsed = parseMarkdownContent(content, type);
         metadata = parsed.metadata;
         bodyContent = parsed.content;
+        hasFrontmatter = parsed.hasFrontmatter;
       }
 
       set({
@@ -66,6 +71,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
           content: bodyContent,
           metadata,
           isDirty: false,
+          hasFrontmatter,
         },
         isLoading: false,
       });
@@ -116,6 +122,12 @@ export const useEditorStore = create<EditorState>((set, get) => ({
 
       if (currentFile.type === 'graph') {
         fileContent = serializeJsonContent(currentFile.metadata as GraphData);
+      } else if (currentFile.type === 'doc') {
+        // 普通文档：根据 hasFrontmatter 决定是否保留 frontmatter
+        // 如果原文件有 frontmatter 或者用户填写了标题，则保留 frontmatter
+        const metadata = currentFile.metadata as DocMetadata;
+        const shouldIncludeFrontmatter = currentFile.hasFrontmatter || !!metadata.title;
+        fileContent = serializeDocContent(metadata, currentFile.content, shouldIncludeFrontmatter);
       } else {
         fileContent = serializeMarkdownContent(
           currentFile.metadata as NoteMetadata | ProjectMetadata | RoadmapMetadata,
@@ -145,7 +157,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     set({ isLoading: true, error: null });
 
     try {
-      const dirMap: Record<ContentType, string> = {
+      const dirMap: Record<Exclude<ContentType, 'doc'>, string> = {
         note: 'notes',
         project: 'projects',
         roadmap: 'roadmaps',
@@ -209,6 +221,47 @@ items: []
     } catch (error) {
       console.error('创建文件失败:', error);
       set({ error: `创建文件失败: ${error}`, isLoading: false });
+      throw error;
+    }
+  },
+
+  createDocFile: async (workspacePath, relativePath) => {
+    set({ isLoading: true, error: null });
+
+    try {
+      // 确保路径以 .md 结尾
+      const filePath = relativePath.endsWith('.md') ? relativePath : `${relativePath}.md`;
+      const path = `${workspacePath}/${filePath}`;
+      const filename = filePath.split(/[/\\]/).pop()?.replace('.md', '') || 'untitled';
+      const today = new Date().toISOString().split('T')[0];
+
+      const content = `---
+title: ${filename}
+date: ${today}
+---
+
+`;
+
+      await invokeTauri('create_file', { path, content });
+      set({ isLoading: false });
+      return path;
+    } catch (error) {
+      console.error('创建文档失败:', error);
+      set({ error: `创建文档失败: ${error}`, isLoading: false });
+      throw error;
+    }
+  },
+
+  createFolder: async (workspacePath, relativePath) => {
+    set({ isLoading: true, error: null });
+
+    try {
+      const path = `${workspacePath}/${relativePath}`;
+      await invokeTauri('create_directory', { path });
+      set({ isLoading: false });
+    } catch (error) {
+      console.error('创建文件夹失败:', error);
+      set({ error: `创建文件夹失败: ${error}`, isLoading: false });
       throw error;
     }
   },

@@ -3,6 +3,7 @@ import { NoteMetaForm } from '../forms/NoteMetaForm';
 import { ProjectMetaForm } from '../forms/ProjectMetaForm';
 import { RoadmapMetaForm } from '../forms/RoadmapMetaForm';
 import { GraphMetaForm } from '../forms/GraphMetaForm';
+import { DocMetaForm } from '../forms/DocMetaForm';
 
 export function MetadataPanel() {
   const { currentFile } = useEditorStore();
@@ -26,6 +27,7 @@ export function MetadataPanel() {
         {currentFile.type === 'project' && <ProjectMetaForm />}
         {currentFile.type === 'roadmap' && <RoadmapMetaForm />}
         {currentFile.type === 'graph' && <GraphMetaForm />}
+        {currentFile.type === 'doc' && <DocMetaForm />}
       </div>
     </div>
   );

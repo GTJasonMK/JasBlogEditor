@@ -2,8 +2,11 @@
  * 内容类型定义
  */
 
+// 工作区类型
+export type WorkspaceType = 'jasblog' | 'docs';
+
 // 内容类型枚举
-export type ContentType = 'note' | 'project' | 'roadmap' | 'graph';
+export type ContentType = 'note' | 'project' | 'roadmap' | 'graph' | 'doc';
 
 // 通用元数据接口
 export interface BaseMetadata {
@@ -47,6 +50,12 @@ export interface RoadmapItem {
   description?: string;
 }
 
+// 普通文档元数据（简化版）
+export interface DocMetadata {
+  title: string;
+  date?: string;
+}
+
 // 知识图谱数据
 export interface GraphData {
   name: string;
@@ -86,13 +95,15 @@ export interface EditorFile {
   name: string;
   type: ContentType;
   content: string;
-  metadata: NoteMetadata | ProjectMetadata | RoadmapMetadata | GraphData;
+  metadata: NoteMetadata | ProjectMetadata | RoadmapMetadata | GraphData | DocMetadata;
   isDirty: boolean;
+  hasFrontmatter: boolean;  // 标记原文件是否有 frontmatter
 }
 
 // 设置
 export interface Settings {
   workspacePath: string | null;
+  workspaceType?: WorkspaceType;  // 工作区类型
   lastOpenedFile: string | null;
   miniModeSettings?: MiniModeSettings;
 }
@@ -114,8 +125,8 @@ export interface WindowState {
   isMaximized: boolean;
 }
 
-// 目录映射
-export const CONTENT_DIRS: Record<ContentType, string> = {
+// 目录映射（仅 JasBlog 模式使用）
+export const CONTENT_DIRS: Record<Exclude<ContentType, 'doc'>, string> = {
   note: 'notes',
   project: 'projects',
   roadmap: 'roadmaps',
@@ -128,4 +139,5 @@ export const FILE_EXTENSIONS: Record<ContentType, string> = {
   project: '.md',
   roadmap: '.md',
   graph: '.json',
+  doc: '.md',
 };

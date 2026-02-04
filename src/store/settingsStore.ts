@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { invokeTauri } from '@/platform/tauri';
-import type { Settings, MiniModeSettings } from '@/types';
+import type { Settings, MiniModeSettings, WorkspaceType } from '@/types';
 
 interface SettingsState {
   settings: Settings;
@@ -9,6 +9,7 @@ interface SettingsState {
   loadSettings: () => Promise<void>;
   saveSettings: (settings: Partial<Settings>) => Promise<void>;
   setWorkspacePath: (path: string | null) => Promise<void>;
+  setWorkspaceType: (type: WorkspaceType) => Promise<void>;
   saveMiniModeSettings: (miniSettings: MiniModeSettings) => Promise<void>;
   clearError: () => void;
 }
@@ -16,6 +17,7 @@ interface SettingsState {
 // Rust 返回的 Settings 使用 snake_case
 interface RustSettings {
   workspace_path: string | null;
+  workspace_type: string | null;
   last_opened_file: string | null;
   mini_mode_settings?: {
     width: number;
@@ -29,6 +31,7 @@ interface RustSettings {
 function toRustSettings(settings: Settings): RustSettings {
   return {
     workspace_path: settings.workspacePath,
+    workspace_type: settings.workspaceType || null,
     last_opened_file: settings.lastOpenedFile,
     mini_mode_settings: settings.miniModeSettings ? {
       width: settings.miniModeSettings.width,
@@ -43,6 +46,7 @@ function toRustSettings(settings: Settings): RustSettings {
 function fromRustSettings(rust: RustSettings): Settings {
   return {
     workspacePath: rust.workspace_path,
+    workspaceType: (rust.workspace_type as WorkspaceType) || undefined,
     lastOpenedFile: rust.last_opened_file,
     miniModeSettings: rust.mini_mode_settings ? {
       width: rust.mini_mode_settings.width,
@@ -93,6 +97,11 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
   setWorkspacePath: async (path) => {
     const { saveSettings } = get();
     await saveSettings({ workspacePath: path });
+  },
+
+  setWorkspaceType: async (type) => {
+    const { saveSettings } = get();
+    await saveSettings({ workspaceType: type });
   },
 
   saveMiniModeSettings: async (miniSettings) => {

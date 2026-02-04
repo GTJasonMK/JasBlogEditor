@@ -4,7 +4,7 @@
  */
 
 import { parse as parseYAML, stringify as stringifyYAML } from 'yaml';
-import type { ContentType, NoteMetadata, ProjectMetadata, RoadmapMetadata, GraphData } from '@/types';
+import type { ContentType, NoteMetadata, ProjectMetadata, RoadmapMetadata, GraphData, DocMetadata } from '@/types';
 
 /**
  * 解析 Markdown 内容
@@ -13,14 +13,14 @@ import type { ContentType, NoteMetadata, ProjectMetadata, RoadmapMetadata, Graph
 export function parseMarkdownContent(
   raw: string,
   type: ContentType
-): { metadata: NoteMetadata | ProjectMetadata | RoadmapMetadata; content: string } {
+): { metadata: NoteMetadata | ProjectMetadata | RoadmapMetadata | DocMetadata; content: string; hasFrontmatter: boolean } {
   // 匹配 YAML frontmatter: --- ... ---
   const frontmatterMatch = raw.match(/^---\r?\n([\s\S]*?)\r?\n---\r?\n?([\s\S]*)$/);
 
   if (!frontmatterMatch) {
     // 没有 frontmatter，返回默认元数据
     const defaultMetadata = getDefaultMetadata(type);
-    return { metadata: defaultMetadata, content: raw };
+    return { metadata: defaultMetadata, content: raw, hasFrontmatter: false };
   }
 
   const yamlContent = frontmatterMatch[1];
@@ -31,12 +31,12 @@ export function parseMarkdownContent(
     parsed = parseYAML(yamlContent) || {};
   } catch (error) {
     console.error('YAML 解析失败:', error);
-    return { metadata: getDefaultMetadata(type), content: bodyContent };
+    return { metadata: getDefaultMetadata(type), content: bodyContent, hasFrontmatter: true };
   }
 
   // 根据类型构建元数据
   const metadata = buildMetadata(parsed, type);
-  return { metadata, content: bodyContent };
+  return { metadata, content: bodyContent, hasFrontmatter: true };
 }
 
 /**
@@ -45,7 +45,7 @@ export function parseMarkdownContent(
 function buildMetadata(
   parsed: Record<string, unknown>,
   type: ContentType
-): NoteMetadata | ProjectMetadata | RoadmapMetadata {
+): NoteMetadata | ProjectMetadata | RoadmapMetadata | DocMetadata {
   const today = new Date().toISOString().split('T')[0];
 
   if (type === 'note') {
@@ -70,11 +70,18 @@ function buildMetadata(
     };
   }
 
-  // roadmap
+  if (type === 'roadmap') {
+    return {
+      title: String(parsed.title || ''),
+      description: String(parsed.description || ''),
+      items: normalizeRoadmapItems(parsed.items),
+    };
+  }
+
+  // doc 类型（普通文档）
   return {
     title: String(parsed.title || ''),
-    description: String(parsed.description || ''),
-    items: normalizeRoadmapItems(parsed.items),
+    date: parsed.date ? String(parsed.date) : undefined,
   };
 }
 
@@ -213,7 +220,7 @@ export function serializeJsonContent(data: GraphData): string {
 /**
  * 获取默认元数据
  */
-function getDefaultMetadata(type: ContentType): NoteMetadata | ProjectMetadata | RoadmapMetadata {
+function getDefaultMetadata(type: ContentType): NoteMetadata | ProjectMetadata | RoadmapMetadata | DocMetadata {
   const today = new Date().toISOString().split('T')[0];
 
   if (type === 'note') {
@@ -235,10 +242,51 @@ function getDefaultMetadata(type: ContentType): NoteMetadata | ProjectMetadata |
     };
   }
 
-  // roadmap
+  if (type === 'roadmap') {
+    return {
+      title: '',
+      description: '',
+      items: [],
+    };
+  }
+
+  // doc 类型
   return {
     title: '',
-    description: '',
-    items: [],
+    date: undefined,
   };
+}
+
+/**
+ * 序列化普通文档内容
+ */
+export function serializeDocContent(
+  metadata: DocMetadata,
+  content: string,
+  includeFrontmatter: boolean
+): string {
+  if (!includeFrontmatter) {
+    return content;
+  }
+
+  const cleanedMetadata: Record<string, unknown> = {};
+  if (metadata.title) {
+    cleanedMetadata.title = metadata.title;
+  }
+  if (metadata.date) {
+    cleanedMetadata.date = metadata.date;
+  }
+
+  // 如果清理后没有任何元数据，就不添加 frontmatter
+  if (Object.keys(cleanedMetadata).length === 0) {
+    return content;
+  }
+
+  const yaml = stringifyYAML(cleanedMetadata, {
+    lineWidth: 0,
+    defaultStringType: 'PLAIN',
+    defaultKeyType: 'PLAIN',
+  });
+
+  return `---\n${yaml}---\n\n${content}`;
 }

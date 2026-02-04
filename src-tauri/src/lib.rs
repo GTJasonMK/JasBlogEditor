@@ -27,6 +27,7 @@ pub struct MiniModeSettings {
 #[derive(Debug, Serialize, Deserialize, Default)]
 pub struct Settings {
     pub workspace_path: Option<String>,
+    pub workspace_type: Option<String>,  // "jasblog" | "docs"
     pub last_opened_file: Option<String>,
     pub mini_mode_settings: Option<MiniModeSettings>,
 }
@@ -122,6 +123,13 @@ fn delete_file(path: String) -> Result<(), String> {
         .map_err(|e| format!("删除文件失败: {}", e))
 }
 
+// 创建目录
+#[tauri::command]
+fn create_directory(path: String) -> Result<(), String> {
+    fs::create_dir_all(&path)
+        .map_err(|e| format!("创建目录失败: {}", e))
+}
+
 // 检查路径是否存在
 #[tauri::command]
 fn path_exists(path: String) -> bool {
@@ -168,6 +176,7 @@ pub fn run() {
             write_file,
             create_file,
             delete_file,
+            create_directory,
             path_exists,
             get_settings,
             save_settings
