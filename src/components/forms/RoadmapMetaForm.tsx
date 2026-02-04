@@ -64,7 +64,7 @@ export function RoadmapMetaForm() {
 
         <div className="space-y-2">
           {metadata.items.map((item, index) => (
-            <div key={index} className="p-2 border border-[var(--color-border)] rounded-md bg-white">
+            <div key={index} className="p-2 border border-[var(--color-border)] rounded-md bg-[var(--color-paper)]">
               <div className="flex items-center gap-2 mb-2">
                 <input
                   type="text"
@@ -75,7 +75,7 @@ export function RoadmapMetaForm() {
                 />
                 <button
                   onClick={() => removeItem(index)}
-                  className="text-[var(--color-text-muted)] hover:text-red-500"
+                  className="text-[var(--color-text-muted)] hover:text-[var(--color-danger)]"
                 >
                   <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />

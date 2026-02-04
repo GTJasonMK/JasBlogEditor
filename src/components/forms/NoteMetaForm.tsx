@@ -17,19 +17,19 @@ export function NoteMetaForm() {
       {/* 标题 */}
       <div>
         <label className="block text-xs text-[var(--color-text-muted)] mb-1">
-          标题 <span className="text-red-500">*</span>
+          标题 <span className="text-[var(--color-danger)]">*</span>
         </label>
         <input
           type="text"
           value={metadata.title}
           onChange={(e) => updateMetadata({ title: e.target.value })}
           className={`w-full px-3 py-2 text-sm border rounded-md focus:outline-none focus:border-[var(--color-primary)] ${
-            isTitleEmpty ? 'border-red-300' : 'border-[var(--color-border)]'
+            isTitleEmpty ? 'border-[var(--color-danger)]' : 'border-[var(--color-border)]'
           }`}
           required
         />
         {isTitleEmpty && (
-          <span className="text-xs text-red-500 mt-1">标题不能为空</span>
+          <span className="text-xs text-[var(--color-danger)] mt-1">标题不能为空</span>
         )}
       </div>
 

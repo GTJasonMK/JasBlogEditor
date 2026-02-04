@@ -1,7 +1,8 @@
 import { useState, useEffect } from 'react';
 import { useSettingsStore, useFileStore, useEditorStore } from '@/store';
 import { openFolderDialog } from '@/platform/tauri';
-import type { ContentType } from '@/types';
+import { applyTheme, getEffectiveTheme } from '@/utils';
+import type { ContentType, ThemeMode } from '@/types';
 
 // JasBlog 模式下的内容类型标签
 const JASBLOG_TYPE_LABELS: Record<string, string> = {
@@ -12,15 +13,19 @@ const JASBLOG_TYPE_LABELS: Record<string, string> = {
 };
 
 export function Toolbar() {
-  const { settings, setWorkspacePath, setWorkspaceType, error: settingsError, clearError: clearSettingsError } = useSettingsStore();
+  const { settings, setWorkspacePath, setWorkspaceType, setTheme, error: settingsError, clearError: clearSettingsError } = useSettingsStore();
   const { workspaceType, refreshFileTree, detectWorkspaceType, setWorkspaceType: setFileStoreWorkspaceType } = useFileStore();
   const { currentFile, saveFile, viewMode, setViewMode, isLoading, toggleMiniMode, error: editorError, clearError: clearEditorError } = useEditorStore();
   const [showNewMenu, setShowNewMenu] = useState(false);
+  const [showThemeMenu, setShowThemeMenu] = useState(false);
   const [showNewDialog, setShowNewDialog] = useState<Exclude<ContentType, 'doc'> | null>(null);
   const [showDocDialog, setShowDocDialog] = useState(false);
   const [showFolderDialog, setShowFolderDialog] = useState(false);
   const [newFilename, setNewFilename] = useState('');
   const [localError, setLocalError] = useState<string | null>(null);
+
+  const currentTheme = settings.theme || 'system';
+  const effectiveTheme = getEffectiveTheme(currentTheme);
 
   // 合并错误信息
   const displayError = localError || editorError || settingsError;
@@ -157,9 +162,15 @@ export function Toolbar() {
     clearSettingsError();
   };
 
+  const handleSetTheme = async (theme: ThemeMode) => {
+    setShowThemeMenu(false);
+    applyTheme(theme);
+    await setTheme(theme);
+  };
+
   return (
     <>
-      <div className="h-12 bg-white border-b border-[var(--color-border)] flex items-center px-4 gap-3 select-none">
+      <div className="h-12 bg-[var(--color-paper)] border-b border-[var(--color-border)] flex items-center px-4 gap-3 select-none">
       {/* 工作区路径 */}
       <button
         onClick={handleSelectWorkspace}
@@ -190,7 +201,7 @@ export function Toolbar() {
         </button>
 
         {showNewMenu && (
-          <div className="absolute top-full left-0 mt-1 bg-white border border-[var(--color-border)] rounded-md shadow-lg py-1 z-50 min-w-[120px]">
+          <div className="absolute top-full left-0 mt-1 bg-[var(--color-paper)] border border-[var(--color-border)] rounded-md shadow-lg py-1 z-50 min-w-[120px]">
             {workspaceType === 'jasblog' ? (
               // JasBlog 模式: 显示内容类型选项
               (['note', 'project', 'roadmap', 'graph'] as Exclude<ContentType, 'doc'>[]).map((type) => (
@@ -245,7 +256,7 @@ export function Toolbar() {
       <button
         onClick={handleDelete}
         disabled={!currentFile}
-        className="flex items-center gap-1 px-3 py-1.5 text-sm text-red-600 hover:bg-red-50 disabled:opacity-50 disabled:cursor-not-allowed rounded-md transition-colors"
+        className="flex items-center gap-1 px-3 py-1.5 text-sm text-[var(--color-danger)] hover:bg-[var(--color-danger-hover)] disabled:opacity-50 disabled:cursor-not-allowed rounded-md transition-colors"
       >
         <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
@@ -265,7 +276,7 @@ export function Toolbar() {
               onClick={() => setViewMode(mode)}
               className={`px-3 py-1 text-sm rounded transition-colors ${
                 viewMode === mode
-                  ? 'bg-white shadow-sm text-[var(--color-text)]'
+                  ? 'bg-[var(--color-paper)] shadow-sm text-[var(--color-text)]'
                   : 'text-[var(--color-text-muted)] hover:text-[var(--color-text)]'
               }`}
             >
@@ -274,6 +285,57 @@ export function Toolbar() {
           ))}
         </div>
       )}
+
+      {/* 主题切换 */}
+      <div className="relative">
+        <button
+          onClick={() => setShowThemeMenu(!showThemeMenu)}
+          className="flex items-center gap-1 px-2 py-1.5 text-sm text-[var(--color-text-muted)] hover:text-[var(--color-text)] hover:bg-[var(--color-surface)] rounded-md transition-colors"
+          title="切换主题"
+        >
+          {effectiveTheme === 'dark' ? (
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" />
+            </svg>
+          ) : (
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" />
+            </svg>
+          )}
+        </button>
+
+        {showThemeMenu && (
+          <div className="absolute top-full right-0 mt-1 bg-[var(--color-paper)] border border-[var(--color-border)] rounded-md shadow-lg py-1 z-50 min-w-[100px]">
+            <button
+              onClick={() => handleSetTheme('light')}
+              className={`w-full px-4 py-2 text-sm text-left hover:bg-[var(--color-surface)] transition-colors flex items-center gap-2 ${currentTheme === 'light' ? 'text-[var(--color-primary)]' : ''}`}
+            >
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" />
+              </svg>
+              浅色
+            </button>
+            <button
+              onClick={() => handleSetTheme('dark')}
+              className={`w-full px-4 py-2 text-sm text-left hover:bg-[var(--color-surface)] transition-colors flex items-center gap-2 ${currentTheme === 'dark' ? 'text-[var(--color-primary)]' : ''}`}
+            >
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" />
+              </svg>
+              深色
+            </button>
+            <button
+              onClick={() => handleSetTheme('system')}
+              className={`w-full px-4 py-2 text-sm text-left hover:bg-[var(--color-surface)] transition-colors flex items-center gap-2 ${currentTheme === 'system' ? 'text-[var(--color-primary)]' : ''}`}
+            >
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+              </svg>
+              跟随系统
+            </button>
+          </div>
+        )}
+      </div>
 
       {/* 迷你模式切换 */}
       {currentFile && (
@@ -299,7 +361,7 @@ export function Toolbar() {
       {/* 新建文件对话框 (JasBlog 模式) */}
       {showNewDialog && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg p-6 w-[400px] shadow-xl">
+          <div className="bg-[var(--color-paper)] rounded-lg p-6 w-[400px] shadow-xl">
             <h3 className="text-lg font-medium mb-4">新建{JASBLOG_TYPE_LABELS[showNewDialog]}</h3>
             <input
               type="text"
@@ -335,7 +397,7 @@ export function Toolbar() {
       {/* 新建文档对话框 (普通文档模式) */}
       {showDocDialog && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg p-6 w-[400px] shadow-xl">
+          <div className="bg-[var(--color-paper)] rounded-lg p-6 w-[400px] shadow-xl">
             <h3 className="text-lg font-medium mb-4">新建文档</h3>
             <input
               type="text"
@@ -374,7 +436,7 @@ export function Toolbar() {
       {/* 新建文件夹对话框 (普通文档模式) */}
       {showFolderDialog && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg p-6 w-[400px] shadow-xl">
+          <div className="bg-[var(--color-paper)] rounded-lg p-6 w-[400px] shadow-xl">
             <h3 className="text-lg font-medium mb-4">新建文件夹</h3>
             <input
               type="text"
@@ -414,14 +476,14 @@ export function Toolbar() {
       {/* 错误提示 */}
       {displayError && (
         <div className="absolute top-14 left-1/2 -translate-x-1/2 z-50 animate-in fade-in slide-in-from-top-2">
-          <div className="flex items-center gap-2 px-4 py-2 bg-red-50 border border-red-200 rounded-lg shadow-lg">
-            <svg className="w-4 h-4 text-red-500 flex-shrink-0" viewBox="0 0 20 20" fill="currentColor">
+          <div className="flex items-center gap-2 px-4 py-2 bg-[var(--color-danger-bg)] border border-[var(--color-danger)] rounded-lg shadow-lg">
+            <svg className="w-4 h-4 text-[var(--color-danger)] flex-shrink-0" viewBox="0 0 20 20" fill="currentColor">
               <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
             </svg>
-            <span className="text-sm text-red-700 max-w-[400px] truncate">{displayError}</span>
+            <span className="text-sm text-[var(--color-danger)] max-w-[400px] truncate">{displayError}</span>
             <button
               onClick={handleDismissError}
-              className="ml-2 text-red-400 hover:text-red-600 transition-colors"
+              className="ml-2 text-[var(--color-danger)] opacity-60 hover:opacity-100 transition-opacity"
               aria-label="关闭错误提示"
             >
               <svg className="w-4 h-4" viewBox="0 0 20 20" fill="currentColor">

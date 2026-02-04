@@ -5,6 +5,9 @@
 // 工作区类型
 export type WorkspaceType = 'jasblog' | 'docs';
 
+// 主题模式
+export type ThemeMode = 'light' | 'dark' | 'system';
+
 // 内容类型枚举
 export type ContentType = 'note' | 'project' | 'roadmap' | 'graph' | 'doc';
 
@@ -106,6 +109,7 @@ export interface Settings {
   workspaceType?: WorkspaceType;  // 工作区类型
   lastOpenedFile: string | null;
   miniModeSettings?: MiniModeSettings;
+  theme?: ThemeMode;  // 主题模式
 }
 
 // 迷你写作模式窗口配置

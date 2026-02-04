@@ -52,7 +52,7 @@ export function MarkdownEditor() {
     <textarea
       value={localContent}
       onChange={(e) => handleContentChange(e.target.value)}
-      className="w-full h-full p-4 resize-none bg-white editor-textarea focus:outline-none"
+      className="w-full h-full p-4 resize-none bg-[var(--color-paper)] editor-textarea focus:outline-none"
       placeholder="开始编写..."
     />
   );

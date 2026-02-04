@@ -30,6 +30,7 @@ pub struct Settings {
     pub workspace_type: Option<String>,  // "jasblog" | "docs"
     pub last_opened_file: Option<String>,
     pub mini_mode_settings: Option<MiniModeSettings>,
+    pub theme: Option<String>,  // "light" | "dark" | "system"
 }
 
 // 获取设置文件路径

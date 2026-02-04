@@ -155,3 +155,16 @@ Zustand store 使用异步命令模式调用 Tauri。文件操作流程：
 1. 自实现解析器容易有边界情况 bug，优先使用成熟库
 2. 错误处理应该用户可见，不能只依赖 console
 3. 公共函数应该尽早提取到 utils 目录避免重复
+
+### 2026-02-04: 应用重启后无法识别 JasBlog 工作区
+
+**问题描述**: 添加普通文档目录支持后，应用重启时无法识别已有的 JasBlog 工作区，所有目录都被当作普通文档模式处理
+
+**根本原因**: `App.tsx` 初始化工作区时，只设置了 `fileStore.workspacePath` 并调用 `loadFileTree()`，但没有设置 `fileStore.workspaceType`。由于 `workspaceType` 默认为 `null`，`loadFileTree` 中 `workspaceType === 'jasblog'` 永远不成立，始终进入普通文档模式的 else 分支
+
+**解决方案**: 修改 `App.tsx` 初始化逻辑，在 `loadFileTree` 之前先恢复 `workspaceType`：优先从 `settings.workspaceType` 恢复，否则调用 `detectWorkspaceType()` 重新检测
+
+**修改文件**:
+- `src/App.tsx` - 初始化工作区时先设置 workspaceType
+
+**经验教训**: 添加新的 store 状态（workspaceType）后，必须检查所有初始化路径是否都正确设置了该状态，不能只关注用户交互路径（Toolbar 选择工作区），还要关注应用启动的恢复路径

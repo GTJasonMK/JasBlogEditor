@@ -2,10 +2,11 @@ import { useEffect } from 'react';
 import { Toolbar, Sidebar, EditorArea, MetadataPanel, MiniModeLayout } from '@/components';
 import { useSettingsStore, useFileStore, useEditorStore } from '@/store';
 import { isTauri } from '@/platform/runtime';
+import { applyTheme, setupSystemThemeListener } from '@/utils';
 
 function App() {
   const { loadSettings, settings } = useSettingsStore();
-  const { setWorkspacePath, loadFileTree } = useFileStore();
+  const { setWorkspacePath, setWorkspaceType, detectWorkspaceType, loadFileTree } = useFileStore();
   const saveFile = useEditorStore((state) => state.saveFile);
   const currentFile = useEditorStore((state) => state.currentFile);
   const miniMode = useEditorStore((state) => state.miniMode);
@@ -15,13 +16,37 @@ function App() {
     loadSettings();
   }, [loadSettings]);
 
+  // 主题初始化和系统主题变化监听
+  useEffect(() => {
+    const theme = settings.theme || 'system';
+    applyTheme(theme);
+
+    // 当主题为 system 时，监听系统主题变化
+    if (theme === 'system') {
+      return setupSystemThemeListener(() => applyTheme('system'));
+    }
+  }, [settings.theme]);
+
   // 设置加载完成后，初始化工作区
   useEffect(() => {
-    if (settings.workspacePath) {
+    const initWorkspace = async () => {
+      if (!settings.workspacePath) return;
+
       setWorkspacePath(settings.workspacePath);
-      loadFileTree();
-    }
-  }, [settings.workspacePath, setWorkspacePath, loadFileTree]);
+
+      // 优先使用已保存的工作区类型，否则重新检测
+      if (settings.workspaceType) {
+        setWorkspaceType(settings.workspaceType);
+      } else {
+        const detectedType = await detectWorkspaceType();
+        setWorkspaceType(detectedType);
+      }
+
+      await loadFileTree();
+    };
+
+    initWorkspace();
+  }, [settings.workspacePath, settings.workspaceType, setWorkspacePath, setWorkspaceType, detectWorkspaceType, loadFileTree]);
 
   // 全局快捷键注册
   useEffect(() => {

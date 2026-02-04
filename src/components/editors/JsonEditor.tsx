@@ -121,7 +121,7 @@ export function JsonEditor() {
           )}
         </div>
         {error && (
-          <div className="flex items-center gap-2 text-red-600">
+          <div className="flex items-center gap-2 text-[var(--color-danger)]">
             <svg className="w-4 h-4" viewBox="0 0 20 20" fill="currentColor">
               <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
             </svg>
@@ -138,8 +138,8 @@ export function JsonEditor() {
         <textarea
           value={localJson}
           onChange={(e) => handleChange(e.target.value)}
-          className={`w-full h-full p-4 resize-none bg-white editor-textarea focus:outline-none ${
-            error ? 'border-l-4 border-l-red-500' : ''
+          className={`w-full h-full p-4 resize-none bg-[var(--color-paper)] editor-textarea focus:outline-none ${
+            error ? 'border-l-4 border-l-[var(--color-danger)]' : ''
           }`}
           spellCheck={false}
           placeholder='{\n  "name": "",\n  "description": "",\n  "nodes": [],\n  "edges": []\n}'
@@ -148,10 +148,10 @@ export function JsonEditor() {
 
       {/* 错误详情 */}
       {error && (
-        <div className="flex-shrink-0 px-4 py-3 bg-red-50 border-t border-red-200">
-          <div className="text-sm text-red-700">
+        <div className="flex-shrink-0 px-4 py-3 bg-[var(--color-danger-bg)] border-t border-[var(--color-danger)]">
+          <div className="text-sm text-[var(--color-danger)]">
             <strong>错误详情：</strong>
-            <code className="ml-2 px-2 py-1 bg-red-100 rounded text-xs">
+            <code className="ml-2 px-2 py-1 bg-[var(--color-danger-hover)] rounded text-xs">
               {error.message}
             </code>
           </div>

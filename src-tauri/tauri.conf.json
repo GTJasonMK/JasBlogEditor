@@ -31,6 +31,9 @@
     "windows": {
       "webviewInstallMode": {
         "type": "skip"
+      },
+      "nsis": {
+        "installerIcon": "icons/icon.ico"
       }
     },
     "icon": [

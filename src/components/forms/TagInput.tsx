@@ -27,7 +27,7 @@ export function TagInput({ tags, onChange, placeholder = '添加标签...' }: Ta
   };
 
   return (
-    <div className="flex flex-wrap gap-1 p-2 border border-[var(--color-border)] rounded-md bg-white min-h-[38px]">
+    <div className="flex flex-wrap gap-1 p-2 border border-[var(--color-border)] rounded-md bg-[var(--color-paper)] min-h-[38px]">
       {tags.map((tag, index) => (
         <span
           key={index}

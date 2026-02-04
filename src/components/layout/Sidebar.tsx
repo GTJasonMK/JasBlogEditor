@@ -18,7 +18,7 @@ export function Sidebar() {
   if (error) {
     return (
       <div className="w-64 bg-[var(--color-surface)] border-r border-[var(--color-border)] p-4">
-        <div className="text-sm text-red-500">{error}</div>
+        <div className="text-sm text-[var(--color-danger)]">{error}</div>
       </div>
     );
   }

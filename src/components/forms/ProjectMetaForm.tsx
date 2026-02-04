@@ -30,19 +30,19 @@ export function ProjectMetaForm() {
       {/* 标题 */}
       <div>
         <label className="block text-xs text-[var(--color-text-muted)] mb-1">
-          项目名称 <span className="text-red-500">*</span>
+          项目名称 <span className="text-[var(--color-danger)]">*</span>
         </label>
         <input
           type="text"
           value={metadata.title}
           onChange={(e) => updateMetadata({ title: e.target.value })}
           className={`w-full px-3 py-2 text-sm border rounded-md focus:outline-none focus:border-[var(--color-primary)] ${
-            isTitleEmpty ? 'border-red-300' : 'border-[var(--color-border)]'
+            isTitleEmpty ? 'border-[var(--color-danger)]' : 'border-[var(--color-border)]'
           }`}
           required
         />
         {isTitleEmpty && (
-          <span className="text-xs text-red-500 mt-1">项目名称不能为空</span>
+          <span className="text-xs text-[var(--color-danger)] mt-1">项目名称不能为空</span>
         )}
       </div>
 
@@ -66,11 +66,11 @@ export function ProjectMetaForm() {
           onChange={(e) => updateMetadata({ github: e.target.value })}
           placeholder="https://github.com/..."
           className={`w-full px-3 py-2 text-sm border rounded-md focus:outline-none focus:border-[var(--color-primary)] ${
-            isGithubInvalid ? 'border-red-300' : 'border-[var(--color-border)]'
+            isGithubInvalid ? 'border-[var(--color-danger)]' : 'border-[var(--color-border)]'
           }`}
         />
         {isGithubInvalid && (
-          <span className="text-xs text-red-500 mt-1">请输入有效的 URL</span>
+          <span className="text-xs text-[var(--color-danger)] mt-1">请输入有效的 URL</span>
         )}
       </div>
 
@@ -83,11 +83,11 @@ export function ProjectMetaForm() {
           onChange={(e) => updateMetadata({ demo: e.target.value || undefined })}
           placeholder="https://..."
           className={`w-full px-3 py-2 text-sm border rounded-md focus:outline-none focus:border-[var(--color-primary)] ${
-            isDemoInvalid ? 'border-red-300' : 'border-[var(--color-border)]'
+            isDemoInvalid ? 'border-[var(--color-danger)]' : 'border-[var(--color-border)]'
           }`}
         />
         {isDemoInvalid && (
-          <span className="text-xs text-red-500 mt-1">请输入有效的 URL</span>
+          <span className="text-xs text-[var(--color-danger)] mt-1">请输入有效的 URL</span>
         )}
       </div>
 

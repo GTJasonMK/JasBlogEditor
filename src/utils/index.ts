@@ -4,3 +4,4 @@
 
 export { extractText, generateId } from './text';
 export { debounce, createDebouncedFn } from './debounce';
+export { applyTheme, getEffectiveTheme, setupSystemThemeListener } from './theme';

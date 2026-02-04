@@ -36,11 +36,11 @@ export function GraphMetaForm() {
       <div className="pt-4 border-t border-[var(--color-border)]">
         <h4 className="text-xs text-[var(--color-text-muted)] mb-2">统计信息</h4>
         <div className="grid grid-cols-2 gap-2">
-          <div className="p-2 bg-white rounded border border-[var(--color-border)]">
+          <div className="p-2 bg-[var(--color-paper)] rounded border border-[var(--color-border)]">
             <div className="text-lg font-medium text-[var(--color-text)]">{metadata.nodes.length}</div>
             <div className="text-xs text-[var(--color-text-muted)]">节点数</div>
           </div>
-          <div className="p-2 bg-white rounded border border-[var(--color-border)]">
+          <div className="p-2 bg-[var(--color-paper)] rounded border border-[var(--color-border)]">
             <div className="text-lg font-medium text-[var(--color-text)]">{metadata.edges.length}</div>
             <div className="text-xs text-[var(--color-text-muted)]">边数</div>
           </div>

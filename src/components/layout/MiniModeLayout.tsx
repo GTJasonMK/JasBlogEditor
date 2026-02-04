@@ -94,7 +94,7 @@ export function MiniModeLayout() {
   if (!currentFile) return null;
 
   return (
-    <div className="h-screen flex flex-col bg-white overflow-hidden rounded-lg">
+    <div className="h-screen flex flex-col bg-[var(--color-paper)] overflow-hidden rounded-lg">
       {/* 自定义标题栏（可拖动） */}
       <div
         className="flex-shrink-0 h-9 flex items-center px-3 gap-2 bg-[var(--color-surface)] border-b border-[var(--color-border)] cursor-move select-none"
@@ -130,7 +130,7 @@ export function MiniModeLayout() {
           {/* 退出按钮 */}
           <button
             onClick={exitMiniMode}
-            className="p-1 rounded hover:bg-red-100 text-[var(--color-text-muted)] hover:text-red-600 transition-colors"
+            className="p-1 rounded hover:bg-[var(--color-danger-hover)] text-[var(--color-text-muted)] hover:text-[var(--color-danger)] transition-colors"
             title="退出迷你模式 (Ctrl+Alt+X)"
           >
             <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -145,7 +145,7 @@ export function MiniModeLayout() {
         ref={textareaRef}
         value={localContent}
         onChange={(e) => handleContentChange(e.target.value)}
-        className="flex-1 min-h-0 p-3 resize-none bg-white editor-textarea focus:outline-none text-sm leading-relaxed overflow-y-auto"
+        className="flex-1 min-h-0 p-3 resize-none bg-[var(--color-paper)] editor-textarea focus:outline-none text-sm leading-relaxed overflow-y-auto"
         placeholder="开始写作..."
         spellCheck={false}
       />
