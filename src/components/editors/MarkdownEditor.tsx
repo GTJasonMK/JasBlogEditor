@@ -1,9 +1,15 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { useEditorStore } from '@/store';
-import { MarkdownRenderer } from '../preview';
+import { ContentPreview } from '../preview';
 
 // 防抖延迟时间（毫秒）
 const DEBOUNCE_DELAY = 300;
+
+// 从完整内容中提取正文（去掉 frontmatter）
+function extractBodyContent(raw: string): string {
+  const match = raw.match(/^---\r?\n[\s\S]*?\r?\n---\r?\n?([\s\S]*)$/);
+  return match ? match[1] : raw;
+}
 
 export function MarkdownEditor() {
   const { currentFile, updateContent, viewMode } = useEditorStore();
@@ -48,6 +54,9 @@ export function MarkdownEditor() {
 
   if (!currentFile) return null;
 
+  // 预览内容：去掉 frontmatter，只渲染正文
+  const bodyContent = extractBodyContent(localContent);
+
   const renderEditor = () => (
     <textarea
       value={localContent}
@@ -59,9 +68,7 @@ export function MarkdownEditor() {
 
   const renderPreview = () => (
     <div className="w-full h-full p-6 overflow-auto bg-[var(--color-paper)]">
-      <article className="prose-chinese">
-        <MarkdownRenderer content={localContent} />
-      </article>
+      <ContentPreview file={currentFile} bodyContent={bodyContent} />
     </div>
   );
 

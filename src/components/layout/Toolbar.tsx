@@ -268,7 +268,7 @@ export function Toolbar() {
       <div className="flex-1" />
 
       {/* 视图切换 */}
-      {currentFile && currentFile.type !== 'graph' && (
+      {currentFile && (
         <div className="flex items-center bg-[var(--color-surface)] rounded-md p-0.5">
           {(['edit', 'preview', 'split'] as const).map((mode) => (
             <button

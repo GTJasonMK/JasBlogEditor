@@ -4,7 +4,18 @@
  */
 
 import { parse as parseYAML, stringify as stringifyYAML } from 'yaml';
-import type { ContentType, NoteMetadata, ProjectMetadata, RoadmapMetadata, GraphData, DocMetadata } from '@/types';
+import type {
+  ContentType,
+  NoteMetadata,
+  ProjectMetadata,
+  RoadmapMetadata,
+  RoadmapItem,
+  RoadmapItemStatus,
+  RoadmapPriority,
+  GraphData,
+  GraphMetadata,
+  DocMetadata,
+} from '@/types';
 
 /**
  * 解析 Markdown 内容
@@ -13,7 +24,7 @@ import type { ContentType, NoteMetadata, ProjectMetadata, RoadmapMetadata, Graph
 export function parseMarkdownContent(
   raw: string,
   type: ContentType
-): { metadata: NoteMetadata | ProjectMetadata | RoadmapMetadata | DocMetadata; content: string; hasFrontmatter: boolean } {
+): { metadata: NoteMetadata | ProjectMetadata | RoadmapMetadata | GraphMetadata | DocMetadata; content: string; hasFrontmatter: boolean } {
   // 匹配 YAML frontmatter: --- ... ---
   const frontmatterMatch = raw.match(/^---\r?\n([\s\S]*?)\r?\n---\r?\n?([\s\S]*)$/);
 
@@ -45,7 +56,7 @@ export function parseMarkdownContent(
 function buildMetadata(
   parsed: Record<string, unknown>,
   type: ContentType
-): NoteMetadata | ProjectMetadata | RoadmapMetadata | DocMetadata {
+): NoteMetadata | ProjectMetadata | RoadmapMetadata | GraphMetadata | DocMetadata {
   const today = new Date().toISOString().split('T')[0];
 
   if (type === 'note') {
@@ -74,7 +85,16 @@ function buildMetadata(
     return {
       title: String(parsed.title || ''),
       description: String(parsed.description || ''),
-      items: normalizeRoadmapItems(parsed.items),
+      date: parsed.date ? String(parsed.date) : undefined,
+      status: normalizeRoadmapStatus(parsed.status),
+    };
+  }
+
+  if (type === 'graph') {
+    return {
+      name: String(parsed.name || parsed.title || ''),
+      description: String(parsed.description || ''),
+      date: parsed.date ? String(parsed.date) : undefined,
     };
   }
 
@@ -119,29 +139,155 @@ function normalizeStatus(value: unknown): 'active' | 'archived' | 'wip' {
 }
 
 /**
- * 标准化 roadmap items 数组
+ * 标准化规划状态
  */
-function normalizeRoadmapItems(value: unknown): RoadmapMetadata['items'] {
-  if (!Array.isArray(value)) return [];
-
-  return value
-    .filter((item): item is Record<string, unknown> =>
-      typeof item === 'object' && item !== null
-    )
-    .map(item => ({
-      title: String(item.title || ''),
-      status: normalizeItemStatus(item.status),
-      description: item.description ? String(item.description) : undefined,
-    }));
+function normalizeRoadmapStatus(value: unknown): 'active' | 'completed' | 'paused' {
+  if (value === 'completed' || value === 'paused') return value;
+  return 'active';
 }
 
 /**
- * 标准化 roadmap item 状态
+ * 从 Markdown 正文解析规划任务列表
+ *
+ * 支持的格式：
+ * - [ ] 任务标题 `priority`
+ *   描述文本
+ *   截止: 2026-06-01
+ *
+ * - [-] 进行中的任务 `high`
+ * - [x] 已完成的任务
+ *
+ * 返回任务列表和剩余的非任务内容
  */
-function normalizeItemStatus(value: unknown): 'completed' | 'in-progress' | 'planned' {
-  if (value === 'completed' || value === 'done') return 'completed';
-  if (value === 'in-progress') return value;
-  return 'planned';
+export function parseRoadmapItemsFromContent(content: string): { items: RoadmapItem[]; remainingContent: string } {
+  const lines = content.split('\n');
+  const items: RoadmapItem[] = [];
+  const nonTaskLines: string[] = [];
+
+  let currentItem: RoadmapItem | null = null;
+  let currentDescription: string[] = [];
+  let itemId = 1;
+
+  // 任务行正则：- [ ] 或 - [-] 或 - [x] 开头，后面是标题，可选 `priority`
+  const taskRegex = /^-\s*\[([ x\-])\]\s+(.+?)(?:\s+`(high|medium|low)`)?\s*$/;
+  // 缩进行正则（至少2个空格）
+  const indentRegex = /^(\s{2,}|\t)(.+)$/;
+  // 截止日期正则
+  const deadlineRegex = /^截止[:：]\s*(.+)$/;
+  // 完成日期正则
+  const completedAtRegex = /^完成[:：]\s*(.+)$/;
+
+  const saveCurrentItem = () => {
+    if (currentItem) {
+      if (currentDescription.length > 0) {
+        currentItem.description = currentDescription.join('\n').trim();
+      }
+      items.push(currentItem);
+      currentItem = null;
+      currentDescription = [];
+    }
+  };
+
+  for (const line of lines) {
+    const taskMatch = line.match(taskRegex);
+
+    if (taskMatch) {
+      // 保存之前的任务
+      saveCurrentItem();
+
+      // 解析新任务
+      const [, checkbox, title, priority] = taskMatch;
+      let status: RoadmapItemStatus = 'todo';
+      if (checkbox === 'x') status = 'done';
+      else if (checkbox === '-') status = 'in_progress';
+
+      currentItem = {
+        id: String(itemId++),
+        title: title.trim(),
+        status,
+        priority: (priority as RoadmapPriority) || 'medium',
+      };
+    } else if (currentItem) {
+      // 当前有任务，检查是否是缩进的描述行
+      const indentMatch = line.match(indentRegex);
+      if (indentMatch) {
+        const text = indentMatch[2];
+        const deadlineMatch = text.match(deadlineRegex);
+        const completedAtMatch = text.match(completedAtRegex);
+        if (deadlineMatch) {
+          currentItem.deadline = deadlineMatch[1].trim();
+        } else if (completedAtMatch) {
+          currentItem.completedAt = completedAtMatch[1].trim();
+        } else {
+          currentDescription.push(text);
+        }
+      } else if (line.trim() === '') {
+        // 空行，可能是任务之间的分隔
+        // 继续保持当前任务状态，允许多段描述
+      } else {
+        // 非缩进的非空行，任务结束
+        saveCurrentItem();
+        nonTaskLines.push(line);
+      }
+    } else {
+      // 没有当前任务，这是普通内容
+      nonTaskLines.push(line);
+    }
+  }
+
+  // 保存最后一个任务
+  saveCurrentItem();
+
+  return {
+    items,
+    remainingContent: nonTaskLines.join('\n').trim(),
+  };
+}
+
+/**
+ * 将规划任务列表序列化为 Markdown 正文
+ */
+export function serializeRoadmapItemsToContent(items: RoadmapItem[]): string {
+  const lines: string[] = [];
+
+  for (const item of items) {
+    // 构建任务行
+    let statusChar = ' ';
+    if (item.status === 'done') {
+      statusChar = 'x';
+    } else if (item.status === 'in_progress') {
+      statusChar = '-';
+    }
+
+    let taskLine = `- [${statusChar}] ${item.title}`;
+    if (item.priority) {
+      taskLine += ` \`${item.priority}\``;
+    }
+    lines.push(taskLine);
+
+    // 添加描述
+    if (item.description) {
+      const descLines = item.description.split('\n');
+      for (const desc of descLines) {
+        lines.push(`  ${desc}`);
+      }
+    }
+
+    // 添加截止日期
+    if (item.deadline) {
+      lines.push(`  截止: ${item.deadline}`);
+    }
+
+    // 添加完成日期
+    if (item.completedAt) {
+      lines.push(`  完成: ${item.completedAt}`);
+    }
+
+    // 空行分隔
+    lines.push('');
+  }
+
+  return lines.join('\n').trim();
 }
 
 /**
@@ -149,7 +295,7 @@ function normalizeItemStatus(value: unknown): 'completed' | 'in-progress' | 'pla
  * 将元数据和正文组合成完整的 Markdown 文件
  */
 export function serializeMarkdownContent(
-  metadata: NoteMetadata | ProjectMetadata | RoadmapMetadata,
+  metadata: NoteMetadata | ProjectMetadata | RoadmapMetadata | GraphMetadata,
   content: string
 ): string {
   // 清理元数据，移除 undefined 和空数组
@@ -188,39 +334,66 @@ function cleanMetadataForYaml(metadata: Record<string, unknown>): Record<string,
 }
 
 /**
- * 解析 JSON 内容（用于 graph 类型）
+ * 从 Markdown 正文中提取 graph 代码块
+ * 返回 { graphData, remainingContent }
+ * 如果没有找到 graph 代码块，返回空数据
  */
-export function parseJsonContent(raw: string): GraphData {
-  try {
-    const data = JSON.parse(raw);
+export function extractGraphFromContent(content: string): {
+  graphData: GraphData;
+  remainingContent: string;
+} {
+  // 匹配 ```graph ... ``` 代码块
+  const graphBlockRegex = /```graph\s*\n([\s\S]*?)\n```/;
+  const match = content.match(graphBlockRegex);
+
+  if (!match) {
+    // 没有 graph 代码块，返回空数据
     return {
-      name: String(data.name || ''),
-      description: String(data.description || ''),
-      nodes: Array.isArray(data.nodes) ? data.nodes : [],
-      edges: Array.isArray(data.edges) ? data.edges : [],
-    };
-  } catch (error) {
-    console.error('JSON 解析失败:', error);
-    return {
-      name: '',
-      description: '',
-      nodes: [],
-      edges: [],
+      graphData: { nodes: [], edges: [] },
+      remainingContent: content.trim(),
     };
   }
+
+  const jsonStr = match[1].trim();
+  let graphData: GraphData;
+
+  try {
+    const parsed = JSON.parse(jsonStr);
+    graphData = {
+      nodes: Array.isArray(parsed.nodes) ? parsed.nodes : [],
+      edges: Array.isArray(parsed.edges) ? parsed.edges : [],
+    };
+  } catch (e) {
+    console.error('图谱 graph 代码块 JSON 格式错误:', e);
+    graphData = { nodes: [], edges: [] };
+  }
+
+  // 移除 graph 代码块，保留其他内容
+  const remainingContent = content.replace(graphBlockRegex, '').trim();
+
+  return { graphData, remainingContent };
 }
 
 /**
- * 序列化 JSON 内容
+ * 将图谱数据序列化到 Markdown 正文中
  */
-export function serializeJsonContent(data: GraphData): string {
-  return JSON.stringify(data, null, 2);
+export function serializeGraphToContent(
+  graphData: GraphData,
+  remainingContent: string
+): string {
+  const graphJson = JSON.stringify(graphData, null, 2);
+  const graphBlock = '```graph\n' + graphJson + '\n```';
+
+  if (remainingContent.trim()) {
+    return remainingContent.trim() + '\n\n' + graphBlock;
+  }
+  return graphBlock;
 }
 
 /**
  * 获取默认元数据
  */
-function getDefaultMetadata(type: ContentType): NoteMetadata | ProjectMetadata | RoadmapMetadata | DocMetadata {
+function getDefaultMetadata(type: ContentType): NoteMetadata | ProjectMetadata | RoadmapMetadata | GraphMetadata | DocMetadata {
   const today = new Date().toISOString().split('T')[0];
 
   if (type === 'note') {
@@ -246,7 +419,15 @@ function getDefaultMetadata(type: ContentType): NoteMetadata | ProjectMetadata |
     return {
       title: '',
       description: '',
-      items: [],
+      status: 'active',
+    };
+  }
+
+  if (type === 'graph') {
+    return {
+      name: '',
+      description: '',
+      date: today,
     };
   }
 

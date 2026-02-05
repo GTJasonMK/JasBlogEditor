@@ -10,8 +10,9 @@ JasBlogEditor 是一个桌面博客内容编辑器，基于 Tauri 2 (Rust 后端
 
 ```bash
 # 开发
-npm run dev:app      # 启动桌面应用开发模式（首次运行需编译 Rust）
-npm run dev          # 仅启动 Vite 开发服务器（端口 1422）
+npm run dev          # 启动 Vite 开发服务器（默认从 1422 起自动找空闲端口）
+npm run dev:app      # 启动桌面应用（自动找空闲端口并同步给 Tauri）
+npm run kill:devport # 结束占用默认开发端口的监听进程（谨慎）
 
 # 构建
 npm run build:app    # 构建桌面应用（生成 NSIS 安装包）
@@ -35,7 +36,9 @@ src/                           # 前端代码
 ├── components/
 │   ├── editors/               # MarkdownEditor, JsonEditor
 │   ├── forms/                 # 元数据表单（NoteMetaForm, ProjectMetaForm 等）
-│   └── layout/                # Sidebar, EditorArea, MetadataPanel, Toolbar
+│   ├── graph/                 # 知识图谱可视化（GraphViewer, GraphCanvas 等）
+│   ├── layout/                # Sidebar, EditorArea, MetadataPanel, Toolbar
+│   └── preview/               # ContentPreview, MarkdownRenderer, MermaidDiagram
 ├── store/                     # Zustand 状态管理
 │   ├── editorStore.ts         # 当前文件状态和操作
 │   ├── fileStore.ts           # 工作区和文件树
@@ -168,3 +171,149 @@ Zustand store 使用异步命令模式调用 Tauri。文件操作流程：
 - `src/App.tsx` - 初始化工作区时先设置 workspaceType
 
 **经验教训**: 添加新的 store 状态（workspaceType）后，必须检查所有初始化路径是否都正确设置了该状态，不能只关注用户交互路径（Toolbar 选择工作区），还要关注应用启动的恢复路径
+
+### 2026-02-04: 回退 RoadmapEditor 可视化编辑器
+
+**问题描述**: 错误地为规划（Roadmap）类型创建了独立的可视化任务卡片编辑器 `RoadmapEditor.tsx`，偏离了软件定位
+
+**根本原因**: 对软件定位理解有误。JasBlogEditor 是一个 Markdown 博客内容编辑器，核心功能是 Markdown 文本编辑 + 实时预览。所有内容类型（笔记、项目、规划）本质上都是 Markdown 文件，编辑器不应将数据变成可视化卡片界面
+
+**解决方案**:
+1. 删除 `src/components/editors/RoadmapEditor.tsx`
+2. `EditorArea.tsx` 移除 RoadmapEditor 引用，规划类型使用 `MarkdownEditor`
+3. `editors/index.ts` 移除 RoadmapEditor 导出
+4. `RoadmapMetaForm.tsx` 恢复完整的 frontmatter 编辑功能（标题、描述、任务列表）
+
+**修改文件**:
+- `src/components/editors/RoadmapEditor.tsx` - 删除
+- `src/components/layout/EditorArea.tsx` - 移除 RoadmapEditor 条件分支
+- `src/components/editors/index.ts` - 移除导出
+- `src/components/forms/RoadmapMetaForm.tsx` - 恢复任务列表编辑功能
+
+**经验教训**: 功能设计前必须先明确软件定位。编辑器的职责是提供良好的 Markdown 编辑体验，元数据面板负责 frontmatter 字段编辑，不能越界变成专用管理工具
+
+### 2026-02-04: 预览显示 frontmatter 原始内容
+
+**问题描述**: Markdown 预览把 YAML frontmatter 当作普通文本渲染，而不是只渲染正文部分
+
+**根本原因**: `MarkdownEditor` 的 `renderPreview` 直接传递 `localContent`（完整文件内容）给 `MarkdownRenderer`，但 JasBlog 网站是先解析 frontmatter，只把正文部分传给渲染器
+
+**解决方案**: 在 `MarkdownEditor.tsx` 中添加 `extractBodyContent` 函数，从完整内容中提取正文部分（去掉 frontmatter），预览时只传递正文
+
+**修改文件**:
+- `src/components/editors/MarkdownEditor.tsx` - 添加 extractBodyContent 函数，预览时使用 previewContent
+
+**经验教训**: 同步两个项目时，不仅要对比组件实现，还要对比数据流。JasBlog 的 `post.content` 是经过 gray-matter 解析后的纯正文，而 JasBlogEditor 的 `currentFile.content` 是完整文件内容
+
+### 2026-02-04: 预览需要还原完整博客页面效果
+
+**问题描述**: 用户要求预览区域能完整还原 JasBlog 网站上的博客文章页面效果，包括标题、日期、标签、技术栈等元数据的渲染，而不仅仅是 Markdown 正文
+
+**根本原因**: 之前只传递正文给 MarkdownRenderer，没有渲染元数据部分。用户期望的是"所见即所得"的预览体验
+
+**解决方案**:
+1. 创建 `ContentPreview` 组件，根据文件类型渲染不同的页面布局（与 JasBlog 各页面保持一致）
+2. 创建 `TechStack` 组件（与 JasBlog 保持一致）
+3. 添加 `.divider-cloud` 和 `.tag` CSS 样式
+4. 修改 `MarkdownEditor` 使用 `ContentPreview` 替代 `MarkdownRenderer`
+
+**新增文件**:
+- `src/components/preview/ContentPreview.tsx` - 内容预览组件，包含 Note/Project/Roadmap/Doc 四种类型的预览
+- `src/components/preview/TechStack.tsx` - 技术栈展示组件
+
+**修改文件**:
+- `src/components/preview/index.ts` - 导出新组件
+- `src/components/editors/MarkdownEditor.tsx` - 使用 ContentPreview
+- `src/index.css` - 添加 divider-cloud、tag 样式
+
+**经验教训**: 编辑器预览功能的目标是"所见即所得"，应该完整还原发布后的效果，而不仅仅是渲染正文内容
+
+### 2026-02-04: 知识图谱无可视化预览
+
+**问题描述**: 知识图谱（graph）类型只有 JSON 编辑功能，无法可视化预览图谱效果
+
+**根本原因**: `JsonEditor` 组件只提供 JSON 文本编辑和语法验证，没有集成图谱可视化。JasBlog 网站使用 `@xyflow/react` (React Flow) 渲染交互式知识图谱
+
+**解决方案**:
+1. 安装 `@xyflow/react` 依赖
+2. 创建图谱组件目录 `src/components/graph/`，从 JasBlog 复制并适配：
+   - `GraphCanvas.tsx` - ReactFlow 画布，包含自定义节点/边类型
+   - `KnowledgeNode.tsx` - 自定义节点组件，支持颜色、标签、锁定状态
+   - `KnowledgeEdge.tsx` - 自定义边组件，贝塞尔曲线 + 流动动画
+   - `NodeDetailPanel.tsx` - 节点详情侧边栏
+   - `GraphViewer.tsx` - 包装组件，管理选中状态和小地图
+3. 更新类型定义 `content.ts`，添加 NodeColor、EdgeColor、KnowledgeNodeData 等类型
+4. 修改 `JsonEditor`，支持 edit/preview/split 三种视图模式，预览时渲染 GraphViewer
+
+**新增文件**:
+- `src/components/graph/index.ts` - 导出
+- `src/components/graph/GraphCanvas.tsx`
+- `src/components/graph/KnowledgeNode.tsx`
+- `src/components/graph/KnowledgeEdge.tsx`
+- `src/components/graph/NodeDetailPanel.tsx`
+- `src/components/graph/GraphViewer.tsx`
+
+**修改文件**:
+- `src/types/content.ts` - 添加图谱相关类型定义
+- `src/components/editors/JsonEditor.tsx` - 添加 GraphViewer 预览
+
+**经验教训**: 所有内容类型都应该提供预览功能，让用户在编辑时就能看到发布后的效果
+
+### 2026-02-05: 同步 JasBlog 规划任务格式重构
+
+**问题描述**: JasBlog 重构了规划（Roadmap）的数据结构，将任务列表从 frontmatter 移到了 Markdown 正文，使用复选框语法表示任务
+
+**根本原因**: JasBlog 提交 `refactor: move roadmap items from frontmatter to body content` 改变了规划文档的数据存储方式
+
+**新格式说明**:
+- Frontmatter 只保留: `title`/`name`, `description`, `date`, `status`（active/completed/paused）
+- 任务使用 Markdown 复选框语法在正文编写:
+  - `- [ ]` 待开始
+  - `- [-]` 进行中
+  - `- [x]` 已完成
+- 优先级使用行内代码（默认 medium）: `` `high` ``, `` `medium` ``, `` `low` ``
+- 缩进行为任务描述
+- 特殊标记: `截止: date`, `完成: date`
+
+**解决方案**:
+1. 更新 `content.ts` 类型定义:
+   - `RoadmapMetadata` 移除 `items`，添加 `date` 和 `status`
+   - `RoadmapItem` 添加 `id`, `priority`（必填，默认 medium）, `deadline`, `completedAt`
+   - 新增 `RoadmapStatus`, `RoadmapPriority`, `RoadmapItemStatus` 类型
+2. 更新 `contentParser.ts`:
+   - `parseRoadmapItemsFromContent()` 返回 `{ items, remainingContent }`
+   - 解析逻辑与 JasBlog `lib/roadmap.ts` 保持一致
+3. 更新 `RoadmapMetaForm`:
+   - 只保留标题、描述、日期、状态字段
+   - 添加任务编写语法提示
+4. 更新 `ContentPreview/RoadmapPreview`:
+   - 标题旁显示规划状态徽章（roadmapStatusConfig）
+   - 任务卡片：左侧优先级圆点 + 标题，右侧状态徽章
+   - 渲染剩余正文内容（renderSimpleMarkdown）
+   - 完成日期显示绿色
+5. 更新 `editorStore` 新文件模板
+
+**修改文件**:
+- `src/types/content.ts` - 类型定义重构
+- `src/services/contentParser.ts` - 解析和序列化逻辑
+- `src/components/forms/RoadmapMetaForm.tsx` - 精简为元数据字段
+- `src/components/preview/ContentPreview.tsx` - 与 JasBlog page.tsx 保持一致
+- `src/store/editorStore.ts` - 更新新文件模板
+
+**经验教训**:
+1. 同步两个项目时必须逐行对比原实现，不能凭记忆或推测
+2. 编辑器与目标网站的数据格式和渲染逻辑必须完全一致
+
+### 2026-02-05: 深色主题 - 图谱组件硬编码白色背景
+
+**问题描述**: 深色主题下，知识图谱的节点详情面板和边标签仍显示白色背景
+
+**根本原因**: `NodeDetailPanel.tsx` 和 `KnowledgeEdge.tsx` 使用了硬编码的 `bg-white` 而非 CSS 变量
+
+**解决方案**: 将 `bg-white` 替换为 `bg-[var(--color-paper)]`
+
+**修改文件**:
+- `src/components/graph/NodeDetailPanel.tsx` - 面板容器背景
+- `src/components/graph/KnowledgeEdge.tsx` - 边标签背景
+
+**经验教训**: 添加深色主题后，所有新增组件都必须使用 CSS 变量而非硬编码颜色。新增组件（尤其是从其他项目复制的）应检查是否使用了 `bg-white`、`text-black` 等硬编码值

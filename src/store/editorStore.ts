@@ -1,9 +1,9 @@
 import { create } from 'zustand';
 import { invokeTauri, getWindowState, setMiniModeWindow, restoreNormalWindow, getCurrentMiniModeSettings } from '@/platform/tauri';
-import { parseMarkdownContent, serializeMarkdownContent, parseJsonContent, serializeJsonContent, serializeDocContent } from '@/services/contentParser';
-import type { ContentType, EditorFile, NoteMetadata, ProjectMetadata, RoadmapMetadata, GraphData, DocMetadata, WindowState } from '@/types';
+import { parseMarkdownContent, serializeMarkdownContent, serializeDocContent } from '@/services/contentParser';
+import type { ContentType, EditorFile, NoteMetadata, ProjectMetadata, RoadmapMetadata, GraphMetadata, DocMetadata, WindowState } from '@/types';
 
-type Metadata = NoteMetadata | ProjectMetadata | RoadmapMetadata | GraphData | DocMetadata;
+type Metadata = NoteMetadata | ProjectMetadata | RoadmapMetadata | GraphMetadata | DocMetadata;
 
 // 迷你模式默认配置
 const DEFAULT_MINI_MODE = { width: 450, height: 350 };
@@ -25,6 +25,8 @@ interface EditorState {
   createDocFile: (workspacePath: string, relativePath: string) => Promise<string>;
   createFolder: (workspacePath: string, relativePath: string) => Promise<void>;
   deleteCurrentFile: () => Promise<void>;
+  deleteFile: (path: string) => Promise<void>;
+  renameFile: (oldPath: string, newPath: string) => Promise<void>;
   setViewMode: (mode: 'edit' | 'preview' | 'split') => void;
   clearError: () => void;
   enterMiniMode: () => Promise<void>;
@@ -47,31 +49,18 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       const content = await invokeTauri<string>('read_file', { path });
       const name = path.split(/[/\\]/).pop() || '';
 
-      let metadata: Metadata;
-      let bodyContent: string;
-      let hasFrontmatter = true;
-
-      if (type === 'graph') {
-        const parsed = parseJsonContent(content);
-        metadata = parsed;
-        bodyContent = content;
-      } else {
-        // note, project, roadmap, doc 都使用 Markdown 解析
-        const parsed = parseMarkdownContent(content, type);
-        metadata = parsed.metadata;
-        bodyContent = parsed.content;
-        hasFrontmatter = parsed.hasFrontmatter;
-      }
+      // 所有类型都使用 Markdown 解析
+      const parsed = parseMarkdownContent(content, type);
 
       set({
         currentFile: {
           path,
           name,
           type,
-          content: bodyContent,
-          metadata,
+          content: parsed.content,
+          metadata: parsed.metadata,
           isDirty: false,
-          hasFrontmatter,
+          hasFrontmatter: parsed.hasFrontmatter,
         },
         isLoading: false,
       });
@@ -120,17 +109,15 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     try {
       let fileContent: string;
 
-      if (currentFile.type === 'graph') {
-        fileContent = serializeJsonContent(currentFile.metadata as GraphData);
-      } else if (currentFile.type === 'doc') {
+      if (currentFile.type === 'doc') {
         // 普通文档：根据 hasFrontmatter 决定是否保留 frontmatter
-        // 如果原文件有 frontmatter 或者用户填写了标题，则保留 frontmatter
         const metadata = currentFile.metadata as DocMetadata;
         const shouldIncludeFrontmatter = currentFile.hasFrontmatter || !!metadata.title;
         fileContent = serializeDocContent(metadata, currentFile.content, shouldIncludeFrontmatter);
       } else {
+        // note, project, roadmap, graph 都使用统一的 Markdown 序列化
         fileContent = serializeMarkdownContent(
-          currentFile.metadata as NoteMetadata | ProjectMetadata | RoadmapMetadata,
+          currentFile.metadata as NoteMetadata | ProjectMetadata | RoadmapMetadata | GraphMetadata,
           currentFile.content
         );
       }
@@ -164,9 +151,8 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         graph: 'graphs',
       };
 
-      const ext = type === 'graph' ? '.json' : '.md';
       const dir = dirMap[type];
-      const path = `${workspacePath}/content/${dir}/${filename}${ext}`;
+      const path = `${workspacePath}/content/${dir}/${filename}.md`;
 
       let content: string;
       const today = new Date().toISOString().split('T')[0];
@@ -196,23 +182,26 @@ status: active
         content = `---
 title: ${filename}
 description:
-items: []
+status: active
 ---
 
-## 规划详情
-
+- [ ] 示例任务
 `;
       } else {
-        content = JSON.stringify(
-          {
-            name: filename,
-            description: '',
-            nodes: [],
-            edges: [],
-          },
-          null,
-          2
-        );
+        // graph 类型：使用 Markdown + graph 代码块格式
+        content = `---
+name: ${filename}
+description:
+date: ${today}
+---
+
+\`\`\`graph
+{
+  "nodes": [],
+  "edges": []
+}
+\`\`\`
+`;
       }
 
       await invokeTauri('create_file', { path, content });
@@ -278,6 +267,54 @@ date: ${today}
     } catch (error) {
       console.error('删除文件失败:', error);
       set({ error: `删除文件失败: ${error}`, isLoading: false });
+      throw error;
+    }
+  },
+
+  deleteFile: async (path: string) => {
+    const { currentFile } = get();
+
+    set({ isLoading: true, error: null });
+
+    try {
+      await invokeTauri('delete_file', { path });
+      // 如果删除的是当前打开的文件，关闭它
+      if (currentFile?.path === path) {
+        set({ currentFile: null, isLoading: false });
+      } else {
+        set({ isLoading: false });
+      }
+    } catch (error) {
+      console.error('删除文件失败:', error);
+      set({ error: `删除文件失败: ${error}`, isLoading: false });
+      throw error;
+    }
+  },
+
+  renameFile: async (oldPath: string, newPath: string) => {
+    const { currentFile } = get();
+
+    set({ isLoading: true, error: null });
+
+    try {
+      await invokeTauri('rename_file', { oldPath, newPath });
+      // 如果重命名的是当前打开的文件，更新路径和名称
+      if (currentFile?.path === oldPath) {
+        const newName = newPath.split(/[/\\]/).pop() || '';
+        set({
+          currentFile: {
+            ...currentFile,
+            path: newPath,
+            name: newName,
+          },
+          isLoading: false,
+        });
+      } else {
+        set({ isLoading: false });
+      }
+    } catch (error) {
+      console.error('重命名文件失败:', error);
+      set({ error: `重命名文件失败: ${error}`, isLoading: false });
       throw error;
     }
   },

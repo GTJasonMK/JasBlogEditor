@@ -31,6 +31,7 @@ npm-debug.log*
 # Tauri build artifacts
 src-tauri/target/
 src-tauri/Cargo.lock
+src-tauri/tauri.conf.dev*.json
 
 # Generated icons (keep source SVG)
 src-tauri/icons/*.png

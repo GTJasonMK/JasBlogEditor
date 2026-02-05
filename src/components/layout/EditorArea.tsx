@@ -1,6 +1,5 @@
 import { useEditorStore } from '@/store';
 import { MarkdownEditor } from '../editors/MarkdownEditor';
-import { JsonEditor } from '../editors/JsonEditor';
 
 export function EditorArea() {
   const { currentFile, isLoading } = useEditorStore();
@@ -26,9 +25,6 @@ export function EditorArea() {
     );
   }
 
-  if (currentFile.type === 'graph') {
-    return <JsonEditor />;
-  }
-
+  // 所有类型统一使用 MarkdownEditor
   return <MarkdownEditor />;
 }

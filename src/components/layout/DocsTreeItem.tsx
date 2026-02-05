@@ -6,9 +6,10 @@ interface DocsTreeItemProps {
   node: FileTreeNode;
   currentPath?: string;
   depth?: number;
+  onContextMenu?: (e: React.MouseEvent, node: FileTreeNode) => void;
 }
 
-export function DocsTreeItem({ node, currentPath, depth = 0 }: DocsTreeItemProps) {
+export function DocsTreeItem({ node, currentPath, depth = 0, onContextMenu }: DocsTreeItemProps) {
   // 默认展开前两层
   const [expanded, setExpanded] = useState(depth < 2);
   const { openFile } = useEditorStore();
@@ -21,6 +22,13 @@ export function DocsTreeItem({ node, currentPath, depth = 0 }: DocsTreeItemProps
     }
   };
 
+  const handleContextMenu = (e: React.MouseEvent) => {
+    // 只对文件显示右键菜单
+    if (!node.isDir && onContextMenu) {
+      onContextMenu(e, node);
+    }
+  };
+
   const isActive = currentPath === node.path;
   const paddingLeft = depth * 12 + 8;
 
@@ -28,6 +36,7 @@ export function DocsTreeItem({ node, currentPath, depth = 0 }: DocsTreeItemProps
     <div>
       <button
         onClick={handleClick}
+        onContextMenu={handleContextMenu}
         style={{ paddingLeft: `${paddingLeft}px` }}
         className={`w-full flex items-center gap-2 pr-2 py-1.5 text-sm rounded transition-colors ${
           isActive
@@ -78,6 +87,7 @@ export function DocsTreeItem({ node, currentPath, depth = 0 }: DocsTreeItemProps
               node={child}
               currentPath={currentPath}
               depth={depth + 1}
+              onContextMenu={onContextMenu}
             />
           ))}
         </div>

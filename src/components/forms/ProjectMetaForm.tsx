@@ -25,6 +25,12 @@ export function ProjectMetaForm() {
   const isGithubInvalid = metadata.github && !isValidUrl(metadata.github);
   const isDemoInvalid = metadata.demo && !isValidUrl(metadata.demo);
 
+  // 技术栈：TechStackItem[] <-> string[] 转换
+  const techStackNames = (metadata.techStack || []).map(item => item.name);
+  const handleTechStackChange = (names: string[]) => {
+    updateMetadata({ techStack: names.map(name => ({ name })) });
+  };
+
   return (
     <div className="space-y-4">
       {/* 标题 */}
@@ -103,6 +109,16 @@ export function ProjectMetaForm() {
           <option value="wip">开发中</option>
           <option value="archived">归档</option>
         </select>
+      </div>
+
+      {/* 技术栈 */}
+      <div>
+        <label className="block text-xs text-[var(--color-text-muted)] mb-1">技术栈</label>
+        <TagInput
+          tags={techStackNames}
+          onChange={handleTechStackChange}
+          placeholder="输入技术名称，按回车添加"
+        />
       </div>
 
       {/* 标签 */}

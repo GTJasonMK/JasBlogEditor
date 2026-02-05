@@ -56,49 +56,50 @@ function App() {
 
     const setupGlobalShortcuts = async () => {
       try {
-        const { register, unregister, unregisterAll: unregAll } = await import('@tauri-apps/plugin-global-shortcut');
+        const { register, unregisterAll: unregAll, isRegistered } = await import('@tauri-apps/plugin-global-shortcut');
 
-        // 先注销可能已存在的快捷键（避免热重载时重复注册）
-        try {
-          await unregister('Ctrl+Alt+X');
-          await unregister('Ctrl+Alt+S');
-        } catch {
-          // 忽略注销错误
-        }
+        // 保存 unregisterAll 引用以便清理
+        unregisterAll = unregAll;
+
+        // 检查并跳过已注册的快捷键（避免热重载时重复注册错误）
+        const isCtrlAltXRegistered = await isRegistered('Ctrl+Alt+X');
+        const isCtrlAltSRegistered = await isRegistered('Ctrl+Alt+S');
 
         // Ctrl+Alt+X 切换迷你模式
-        await register('Ctrl+Alt+X', (event) => {
-          if (event.state === 'Pressed') {
-            const { currentFile } = useEditorStore.getState();
-            if (currentFile) {
-              useEditorStore.getState().toggleMiniMode();
+        if (!isCtrlAltXRegistered) {
+          await register('Ctrl+Alt+X', (event) => {
+            if (event.state === 'Pressed') {
+              const { currentFile } = useEditorStore.getState();
+              if (currentFile) {
+                useEditorStore.getState().toggleMiniMode();
+              }
             }
-          }
-        });
+          });
+        }
 
         // Ctrl+Alt+S 直接进入迷你写作模式并聚焦到文末
-        await register('Ctrl+Alt+S', async (event) => {
-          if (event.state === 'Pressed') {
-            const { currentFile, miniMode } = useEditorStore.getState();
-            if (!currentFile) return;
+        if (!isCtrlAltSRegistered) {
+          await register('Ctrl+Alt+S', async (event) => {
+            if (event.state === 'Pressed') {
+              const { currentFile, miniMode } = useEditorStore.getState();
+              if (!currentFile) return;
 
-            if (!miniMode) {
-              // 未在迷你模式，先进入
-              await useEditorStore.getState().enterMiniMode();
+              if (!miniMode) {
+                // 未在迷你模式，先进入
+                await useEditorStore.getState().enterMiniMode();
+              }
+
+              // 窗口获取焦点
+              const { getCurrentWindow } = await import('@tauri-apps/api/window');
+              await getCurrentWindow().setFocus();
+
+              // 触发聚焦到文末
+              setTimeout(() => {
+                window.dispatchEvent(new Event('mini-mode-focus'));
+              }, 100);
             }
-
-            // 窗口获取焦点
-            const { getCurrentWindow } = await import('@tauri-apps/api/window');
-            await getCurrentWindow().setFocus();
-
-            // 触发聚焦到文末
-            setTimeout(() => {
-              window.dispatchEvent(new Event('mini-mode-focus'));
-            }, 100);
-          }
-        });
-
-        unregisterAll = unregAll;
+          });
+        }
       } catch (error) {
         console.error('[GlobalShortcut] 注册全局快捷键失败:', error);
       }

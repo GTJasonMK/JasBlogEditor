@@ -1,5 +1,11 @@
 import { useEditorStore } from '@/store';
-import type { RoadmapMetadata, RoadmapItem } from '@/types';
+import type { RoadmapMetadata } from '@/types';
+
+const STATUS_OPTIONS: { value: NonNullable<RoadmapMetadata['status']>; label: string }[] = [
+  { value: 'active', label: '进行中' },
+  { value: 'completed', label: '已完成' },
+  { value: 'paused', label: '暂停' },
+];
 
 export function RoadmapMetaForm() {
   const { currentFile, updateMetadata } = useEditorStore();
@@ -7,24 +13,6 @@ export function RoadmapMetaForm() {
   if (!currentFile || currentFile.type !== 'roadmap') return null;
 
   const metadata = currentFile.metadata as RoadmapMetadata;
-
-  const updateItem = (index: number, updates: Partial<RoadmapItem>) => {
-    const newItems = [...metadata.items];
-    newItems[index] = { ...newItems[index], ...updates };
-    updateMetadata({ items: newItems });
-  };
-
-  const addItem = () => {
-    updateMetadata({
-      items: [...metadata.items, { title: '', status: 'planned', description: '' }],
-    });
-  };
-
-  const removeItem = (index: number) => {
-    updateMetadata({
-      items: metadata.items.filter((_, i) => i !== index),
-    });
-  };
 
   return (
     <div className="space-y-4">
@@ -35,7 +23,7 @@ export function RoadmapMetaForm() {
           type="text"
           value={metadata.title}
           onChange={(e) => updateMetadata({ title: e.target.value })}
-          className="w-full px-3 py-2 text-sm border border-[var(--color-border)] rounded-md focus:outline-none focus:border-[var(--color-primary)]"
+          className="w-full px-3 py-2 text-sm border border-[var(--color-border)] rounded-md focus:outline-none focus:border-[var(--color-primary)] bg-[var(--color-paper)] text-[var(--color-text)]"
         />
       </div>
 
@@ -46,65 +34,35 @@ export function RoadmapMetaForm() {
           value={metadata.description}
           onChange={(e) => updateMetadata({ description: e.target.value })}
           rows={2}
-          className="w-full px-3 py-2 text-sm border border-[var(--color-border)] rounded-md focus:outline-none focus:border-[var(--color-primary)] resize-none"
+          className="w-full px-3 py-2 text-sm border border-[var(--color-border)] rounded-md focus:outline-none focus:border-[var(--color-primary)] resize-none bg-[var(--color-paper)] text-[var(--color-text)]"
         />
       </div>
 
-      {/* 任务列表 */}
+      {/* 日期 */}
       <div>
-        <div className="flex items-center justify-between mb-2">
-          <label className="text-xs text-[var(--color-text-muted)]">任务列表</label>
-          <button
-            onClick={addItem}
-            className="text-xs text-[var(--color-primary)] hover:underline"
-          >
-            + 添加任务
-          </button>
-        </div>
+        <label className="block text-xs text-[var(--color-text-muted)] mb-1">日期</label>
+        <input
+          type="date"
+          value={metadata.date || ''}
+          onChange={(e) => updateMetadata({ date: e.target.value || undefined })}
+          className="w-full px-3 py-2 text-sm border border-[var(--color-border)] rounded-md focus:outline-none focus:border-[var(--color-primary)] bg-[var(--color-paper)] text-[var(--color-text)]"
+        />
+      </div>
 
-        <div className="space-y-2">
-          {metadata.items.map((item, index) => (
-            <div key={index} className="p-2 border border-[var(--color-border)] rounded-md bg-[var(--color-paper)]">
-              <div className="flex items-center gap-2 mb-2">
-                <input
-                  type="text"
-                  value={item.title}
-                  onChange={(e) => updateItem(index, { title: e.target.value })}
-                  placeholder="任务标题"
-                  className="flex-1 px-2 py-1 text-sm border border-[var(--color-border)] rounded focus:outline-none focus:border-[var(--color-primary)]"
-                />
-                <button
-                  onClick={() => removeItem(index)}
-                  className="text-[var(--color-text-muted)] hover:text-[var(--color-danger)]"
-                >
-                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                  </svg>
-                </button>
-              </div>
-
-              <div className="flex items-center gap-2">
-                <select
-                  value={item.status}
-                  onChange={(e) => updateItem(index, { status: e.target.value as RoadmapItem['status'] })}
-                  className="px-2 py-1 text-xs border border-[var(--color-border)] rounded focus:outline-none focus:border-[var(--color-primary)]"
-                >
-                  <option value="planned">计划中</option>
-                  <option value="in-progress">进行中</option>
-                  <option value="completed">已完成</option>
-                </select>
-              </div>
-
-              <textarea
-                value={item.description || ''}
-                onChange={(e) => updateItem(index, { description: e.target.value })}
-                placeholder="任务描述（可选）"
-                rows={2}
-                className="w-full mt-2 px-2 py-1 text-xs border border-[var(--color-border)] rounded focus:outline-none focus:border-[var(--color-primary)] resize-none"
-              />
-            </div>
+      {/* 状态 */}
+      <div>
+        <label className="block text-xs text-[var(--color-text-muted)] mb-1">状态</label>
+        <select
+          value={metadata.status || 'active'}
+          onChange={(e) => updateMetadata({ status: e.target.value as RoadmapMetadata['status'] })}
+          className="w-full px-3 py-2 text-sm border border-[var(--color-border)] rounded-md focus:outline-none focus:border-[var(--color-primary)] bg-[var(--color-paper)] text-[var(--color-text)]"
+        >
+          {STATUS_OPTIONS.map((opt) => (
+            <option key={opt.value} value={opt.value}>
+              {opt.label}
+            </option>
           ))}
-        </div>
+        </select>
       </div>
     </div>
   );

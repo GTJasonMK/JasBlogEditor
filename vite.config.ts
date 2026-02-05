@@ -4,6 +4,8 @@ import tailwindcss from "@tailwindcss/vite";
 import path from "path";
 
 const host = process.env.TAURI_DEV_HOST;
+const devPort = Number(process.env.JAS_DEV_PORT) || 1422;
+const hmrPort = Number(process.env.JAS_HMR_PORT) || devPort + 1;
 
 export default defineConfig(async () => ({
   plugins: [react(), tailwindcss()],
@@ -14,14 +16,14 @@ export default defineConfig(async () => ({
   },
   clearScreen: false,
   server: {
-    port: 1422,
+    port: devPort,
     strictPort: true,
     host: host || false,
     hmr: host
       ? {
           protocol: "ws",
           host,
-          port: 1423,
+          port: hmrPort,
         }
       : undefined,
     watch: {

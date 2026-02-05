@@ -728,6 +728,78 @@ body {
 }
 
 /* ========================================
+   TipTap 内容样式（GraphAndTable 导出的 HTML）
+   ======================================== */
+
+.tiptap-content {
+  p {
+    margin-bottom: 0.5em;
+  }
+  p:last-child {
+    margin-bottom: 0;
+  }
+  strong {
+    font-weight: 600;
+  }
+  em {
+    font-style: italic;
+  }
+  ul, ol {
+    padding-left: 1.5em;
+    margin-bottom: 0.5em;
+  }
+  ul {
+    list-style-type: disc;
+  }
+  ol {
+    list-style-type: decimal;
+  }
+  li {
+    margin-bottom: 0.25em;
+  }
+  code {
+    background: var(--color-paper-dark);
+    padding: 0.1em 0.3em;
+    border-radius: 3px;
+    font-family: monospace;
+    font-size: 0.9em;
+  }
+  pre {
+    background: var(--color-paper-dark);
+    padding: 0.75em 1em;
+    border-radius: 6px;
+    overflow-x: auto;
+    margin-bottom: 0.5em;
+  }
+  pre code {
+    background: none;
+    padding: 0;
+  }
+  blockquote {
+    border-left: 3px solid var(--color-vermilion);
+    padding-left: 1em;
+    margin-left: 0;
+    color: var(--color-gray);
+    font-style: italic;
+  }
+  h1, h2, h3, h4 {
+    font-weight: 600;
+    margin-top: 1em;
+    margin-bottom: 0.5em;
+  }
+  h1 { font-size: 1.5em; }
+  h2 { font-size: 1.25em; }
+  h3 { font-size: 1.1em; }
+  a {
+    color: var(--color-vermilion);
+    text-decoration: underline;
+  }
+  a:hover {
+    text-decoration: none;
+  }
+}
+
+/* ========================================
    减少动画（辅助功能）
    ======================================== */
 
@@ -804,4 +876,32 @@ body {
 /* 脚注分割线 */
 :root.dark .prose-chinese .footnotes {
   border-top-color: var(--color-border);
+}
+
+/* ========================================
+   JasBlog 组件样式
+   ======================================== */
+
+/* 云纹分割线 */
+.divider-cloud {
+  height: 24px;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 24'%3E%3Cpath d='M0 12 Q25 4 50 12 T100 12' fill='none' stroke='%23c94043' stroke-width='1' opacity='0.2'/%3E%3C/svg%3E");
+  background-repeat: repeat-x;
+  background-position: center;
+}
+
+/* 标签 */
+.tag {
+  display: inline-block;
+  font-size: 0.75rem;
+  padding: 4px 12px;
+  background: var(--color-paper-dark);
+  color: var(--color-gray);
+  border-radius: 20px;
+  transition: background-color 0.2s, color 0.2s;
+}
+
+.tag:hover {
+  background: var(--color-primary);
+  color: white;
 }

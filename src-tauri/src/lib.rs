@@ -124,6 +124,18 @@ fn delete_file(path: String) -> Result<(), String> {
         .map_err(|e| format!("删除文件失败: {}", e))
 }
 
+// 重命名文件
+#[tauri::command]
+fn rename_file(old_path: String, new_path: String) -> Result<(), String> {
+    // 检查新路径是否已存在
+    if std::path::Path::new(&new_path).exists() {
+        return Err("目标文件已存在".to_string());
+    }
+
+    fs::rename(&old_path, &new_path)
+        .map_err(|e| format!("重命名文件失败: {}", e))
+}
+
 // 创建目录
 #[tauri::command]
 fn create_directory(path: String) -> Result<(), String> {
@@ -177,6 +189,7 @@ pub fn run() {
             write_file,
             create_file,
             delete_file,
+            rename_file,
             create_directory,
             path_exists,
             get_settings,
