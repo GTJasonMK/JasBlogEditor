@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import { invokeTauri } from '@/platform/tauri';
-import type { ContentType, WorkspaceType } from '@/types';
+import { CONTENT_DIRS, JASBLOG_CONTENT_TYPES } from '@/types';
+import type { ContentType, WorkspaceType, JasBlogContentType } from '@/types';
 
 export interface FileTreeNode {
   name: string;
@@ -19,25 +20,19 @@ interface FileState {
 
   setWorkspacePath: (path: string) => void;
   setWorkspaceType: (type: WorkspaceType) => void;
+  initWorkspace: (path: string, preferredType?: WorkspaceType | null) => Promise<WorkspaceType>;
   detectWorkspaceType: () => Promise<WorkspaceType>;
   loadFileTree: () => Promise<void>;
   refreshFileTree: () => Promise<void>;
 }
 
-// Rust 返回的 FileInfo 使用 snake_case
-interface RustFileInfo {
-  name: string;
-  path: string;
-  is_dir: boolean;
-}
+// 内容目录映射（JasBlog 模式）：目录名 -> ContentType
+const JASBLOG_DIR_TO_TYPE = Object.fromEntries(
+  Object.entries(CONTENT_DIRS).map(([type, dir]) => [dir, type])
+) as Record<string, JasBlogContentType>;
 
-// 内容目录映射（JasBlog 模式）
-const CONTENT_DIR_MAP: Record<string, ContentType> = {
-  notes: 'note',
-  projects: 'project',
-  roadmaps: 'roadmap',
-  graphs: 'graph',
-};
+// JasBlog 目录排序顺序（与站点一致）
+const JASBLOG_DIR_ORDER = JASBLOG_CONTENT_TYPES.map((type) => CONTENT_DIRS[type]);
 
 // 最大递归深度
 const MAX_DEPTH = 10;
@@ -48,7 +43,7 @@ const MAX_DEPTH = 10;
 async function loadDocsFileTree(dirPath: string, depth = 0): Promise<FileTreeNode[]> {
   if (depth > MAX_DEPTH) return [];
 
-  const files = await invokeTauri<RustFileInfo[]>('read_directory', { path: dirPath });
+  const files = await invokeTauri('read_directory', { path: dirPath });
   const nodes: FileTreeNode[] = [];
 
   for (const file of files) {
@@ -94,13 +89,13 @@ async function loadDocsFileTree(dirPath: string, depth = 0): Promise<FileTreeNod
  */
 async function loadJasBlogFileTree(workspacePath: string): Promise<FileTreeNode[]> {
   const contentPath = `${workspacePath}/content`;
-  const contentDirs = await invokeTauri<RustFileInfo[]>('read_directory', { path: contentPath });
+  const contentDirs = await invokeTauri('read_directory', { path: contentPath });
   const tree: FileTreeNode[] = [];
 
   for (const dir of contentDirs) {
-    if (dir.is_dir && CONTENT_DIR_MAP[dir.name]) {
-      const contentType = CONTENT_DIR_MAP[dir.name];
-      const files = await invokeTauri<RustFileInfo[]>('read_directory', { path: dir.path });
+    if (dir.is_dir && JASBLOG_DIR_TO_TYPE[dir.name]) {
+      const contentType = JASBLOG_DIR_TO_TYPE[dir.name];
+      const files = await invokeTauri('read_directory', { path: dir.path });
 
       const children: FileTreeNode[] = files
         .filter(f => !f.is_dir && !f.name.startsWith('.'))
@@ -122,8 +117,7 @@ async function loadJasBlogFileTree(workspacePath: string): Promise<FileTreeNode[
   }
 
   // 按特定顺序排序
-  const order = ['notes', 'projects', 'roadmaps', 'graphs'];
-  tree.sort((a, b) => order.indexOf(a.name) - order.indexOf(b.name));
+  tree.sort((a, b) => JASBLOG_DIR_ORDER.indexOf(a.name) - JASBLOG_DIR_ORDER.indexOf(b.name));
 
   return tree;
 }
@@ -143,6 +137,19 @@ export const useFileStore = create<FileState>((set, get) => ({
     set({ workspaceType: type });
   },
 
+  initWorkspace: async (path, preferredType = null) => {
+    // 先写入路径，确保 detectWorkspaceType 使用的是最新值
+    set({ workspacePath: path, fileTree: [], error: null });
+
+    // 优先使用外部传入的类型，否则自动检测
+    const workspaceType = preferredType || await get().detectWorkspaceType();
+    set({ workspaceType });
+
+    // 加载文件树
+    await get().loadFileTree();
+    return workspaceType;
+  },
+
   detectWorkspaceType: async () => {
     const { workspacePath } = get();
     if (!workspacePath) return 'docs';
@@ -150,12 +157,12 @@ export const useFileStore = create<FileState>((set, get) => ({
     try {
       // 检查是否有 content/notes 目录（JasBlog 项目标志）
       const contentPath = `${workspacePath}/content`;
-      const notesPath = `${contentPath}/notes`;
+      const notesPath = `${contentPath}/${CONTENT_DIRS.note}`;
 
-      const hasContent = await invokeTauri<boolean>('path_exists', { path: contentPath });
+      const hasContent = await invokeTauri('path_exists', { path: contentPath });
       if (!hasContent) return 'docs';
 
-      const hasNotes = await invokeTauri<boolean>('path_exists', { path: notesPath });
+      const hasNotes = await invokeTauri('path_exists', { path: notesPath });
       return hasNotes ? 'jasblog' : 'docs';
     } catch {
       return 'docs';
@@ -172,7 +179,7 @@ export const useFileStore = create<FileState>((set, get) => ({
       if (workspaceType === 'jasblog') {
         // JasBlog 模式：检查 content 目录
         const contentPath = `${workspacePath}/content`;
-        const contentExists = await invokeTauri<boolean>('path_exists', { path: contentPath });
+        const contentExists = await invokeTauri('path_exists', { path: contentPath });
 
         if (!contentExists) {
           set({ error: '未找到 content 目录，请确认选择的是 JasBlog 项目目录', isLoading: false });

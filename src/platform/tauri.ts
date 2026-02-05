@@ -1,17 +1,39 @@
 import type { OpenDialogOptions } from "@tauri-apps/plugin-dialog";
 import { isTauri } from "./runtime";
 import type { MiniModeSettings, WindowState } from "@/types";
+import type { RustFileInfo, RustSettings } from "./tauriTypes";
 
 /**
  * Tauri 调用封装
  */
 
-export async function invokeTauri<T>(cmd: string, args?: Record<string, unknown>): Promise<T> {
+export type TauriCommandMap = {
+  read_directory: { args: { path: string }; result: RustFileInfo[] };
+  read_file: { args: { path: string }; result: string };
+  write_file: { args: { path: string; content: string }; result: void };
+  create_file: { args: { path: string; content: string }; result: void };
+  delete_file: { args: { path: string }; result: void };
+  rename_file: { args: { oldPath: string; newPath: string }; result: void };
+  create_directory: { args: { path: string }; result: void };
+  path_exists: { args: { path: string }; result: boolean };
+  get_settings: { args: undefined; result: RustSettings };
+  save_settings: { args: { settings: RustSettings }; result: void };
+};
+
+type TypedArgs<C extends keyof TauriCommandMap> = TauriCommandMap[C]["args"];
+type TypedResult<C extends keyof TauriCommandMap> = TauriCommandMap[C]["result"];
+
+export async function invokeTauri<C extends keyof TauriCommandMap>(
+  cmd: C,
+  ...args: TypedArgs<C> extends undefined ? [] : [TypedArgs<C>]
+): Promise<TypedResult<C>>;
+export async function invokeTauri<T>(cmd: string, args?: Record<string, unknown>): Promise<T>;
+export async function invokeTauri(cmd: string, args?: Record<string, unknown>) {
   if (!isTauri()) {
     throw new Error("当前不在 Tauri 环境中运行");
   }
   const { invoke } = await import("@tauri-apps/api/core");
-  return invoke<T>(cmd, args);
+  return invoke(cmd, args);
 }
 
 export async function openFolderDialog(options?: OpenDialogOptions): Promise<string | null> {

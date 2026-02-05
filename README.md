@@ -36,6 +36,9 @@ npm install
 # 启动桌面应用开发模式（自动从 1422 起寻找空闲端口）
 npm run dev:app
 
+# 使用 tauri 子命令启动（等价于 dev:app，自动找空闲端口并同步给 Tauri）
+npm run tauri dev
+
 # 仅启动 Vite 开发服务器（自动从 1422 起寻找空闲端口）
 npm run dev
 

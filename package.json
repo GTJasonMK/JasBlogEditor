@@ -11,7 +11,8 @@
     "build": "tsc -b && vite build",
     "build:app": "tauri build",
     "preview": "vite preview",
-    "tauri": "tauri"
+    "test": "node --test scripts/dev-port.test.mjs",
+    "tauri": "node scripts/tauri.mjs"
   },
   "dependencies": {
     "@tauri-apps/api": "^2.9.1",

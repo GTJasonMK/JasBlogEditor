@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { useEditorStore } from '@/store';
+import { useEditorStore, useWindowStore } from '@/store';
 import { startWindowDragging } from '@/platform/tauri';
 
 // 防抖延迟时间（毫秒）
@@ -10,7 +10,8 @@ const DEBOUNCE_DELAY = 300;
  * 提供简化的编辑界面，支持窗口拖动和基本编辑功能
  */
 export function MiniModeLayout() {
-  const { currentFile, updateContent, saveFile, exitMiniMode } = useEditorStore();
+  const { currentFile, updateContent, saveFile } = useEditorStore();
+  const { exitMiniMode } = useWindowStore();
 
   // 本地内容状态，用于即时响应输入
   const [localContent, setLocalContent] = useState('');

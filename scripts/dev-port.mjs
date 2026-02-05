@@ -80,6 +80,33 @@ export function resolveLocalBin(binName) {
   return fs.existsSync(localBin) ? localBin : binName;
 }
 
+function resolveLocalNodeBinScript(binName) {
+  const candidates = {
+    vite: path.join(repoRoot, "node_modules", "vite", "bin", "vite.js"),
+    tauri: path.join(repoRoot, "node_modules", "@tauri-apps", "cli", "tauri.js"),
+  };
+
+  const scriptPath = candidates[binName];
+  if (!scriptPath) return null;
+  return fs.existsSync(scriptPath) ? scriptPath : null;
+}
+
+/**
+ * 解析本地可执行命令（用于 child_process.spawn）
+ *
+ * 说明：
+ * - Windows 下直接 spawn `.cmd` 有概率出现 `spawn EINVAL`
+ * - 优先使用 Node 入口脚本（vite/tauri）通过 `process.execPath` 启动，规避该问题
+ */
+export function resolveLocalBinCommand(binName) {
+  const nodeScript = resolveLocalNodeBinScript(binName);
+  if (nodeScript) {
+    return { cmd: process.execPath, args: [nodeScript] };
+  }
+
+  return { cmd: resolveLocalBin(binName), args: [] };
+}
+
 export function getRepoRoot() {
   return repoRoot;
 }

@@ -1,9 +1,5 @@
 import { useEditorStore } from '@/store';
-import { NoteMetaForm } from '../forms/NoteMetaForm';
-import { ProjectMetaForm } from '../forms/ProjectMetaForm';
-import { RoadmapMetaForm } from '../forms/RoadmapMetaForm';
-import { GraphMetaForm } from '../forms/GraphMetaForm';
-import { DocMetaForm } from '../forms/DocMetaForm';
+import { CONTENT_TYPE_UI } from '@/config/contentTypeUi';
 
 export function MetadataPanel() {
   const { currentFile } = useEditorStore();
@@ -22,12 +18,10 @@ export function MetadataPanel() {
     <div className="w-72 bg-[var(--color-surface)] border-l border-[var(--color-border)] overflow-y-auto">
       <div className="p-4">
         <h3 className="text-sm font-medium text-[var(--color-text)] mb-4">元数据</h3>
-
-        {currentFile.type === 'note' && <NoteMetaForm />}
-        {currentFile.type === 'project' && <ProjectMetaForm />}
-        {currentFile.type === 'roadmap' && <RoadmapMetaForm />}
-        {currentFile.type === 'graph' && <GraphMetaForm />}
-        {currentFile.type === 'doc' && <DocMetaForm />}
+        {(() => {
+          const MetaForm = CONTENT_TYPE_UI[currentFile.type]?.MetaForm;
+          return MetaForm ? <MetaForm /> : null;
+        })()}
       </div>
     </div>
   );

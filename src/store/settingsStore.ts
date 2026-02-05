@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import { invokeTauri } from '@/platform/tauri';
 import type { Settings, MiniModeSettings, WorkspaceType, ThemeMode } from '@/types';
+import type { RustSettings } from '@/platform/tauriTypes';
 
 interface SettingsState {
   settings: Settings;
@@ -13,20 +14,6 @@ interface SettingsState {
   setTheme: (theme: ThemeMode) => Promise<void>;
   saveMiniModeSettings: (miniSettings: MiniModeSettings) => Promise<void>;
   clearError: () => void;
-}
-
-// Rust 返回的 Settings 使用 snake_case
-interface RustSettings {
-  workspace_path: string | null;
-  workspace_type: string | null;
-  last_opened_file: string | null;
-  mini_mode_settings?: {
-    width: number;
-    height: number;
-    position_x?: number;
-    position_y?: number;
-  };
-  theme?: string | null;
 }
 
 // 前端 Settings 转换为 Rust Settings
@@ -72,7 +59,7 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
   loadSettings: async () => {
     set({ error: null });
     try {
-      const rustSettings = await invokeTauri<RustSettings>('get_settings');
+      const rustSettings = await invokeTauri('get_settings');
       set({
         settings: fromRustSettings(rustSettings),
         isLoading: false,

@@ -5,12 +5,6 @@ import { ContentPreview } from '../preview';
 // 防抖延迟时间（毫秒）
 const DEBOUNCE_DELAY = 300;
 
-// 从完整内容中提取正文（去掉 frontmatter）
-function extractBodyContent(raw: string): string {
-  const match = raw.match(/^---\r?\n[\s\S]*?\r?\n---\r?\n?([\s\S]*)$/);
-  return match ? match[1] : raw;
-}
-
 export function MarkdownEditor() {
   const { currentFile, updateContent, viewMode } = useEditorStore();
 
@@ -54,8 +48,8 @@ export function MarkdownEditor() {
 
   if (!currentFile) return null;
 
-  // 预览内容：去掉 frontmatter，只渲染正文
-  const bodyContent = extractBodyContent(localContent);
+  // 预览内容：store 中已将 frontmatter 与正文分离，此处直接使用正文
+  const bodyContent = localContent;
 
   const renderEditor = () => (
     <textarea

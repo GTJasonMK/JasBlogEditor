@@ -2,7 +2,7 @@ import fs from "node:fs";
 import http from "node:http";
 import path from "node:path";
 import { spawn } from "node:child_process";
-import { pickDevPorts, resolveLocalBin, getRepoRoot } from "./dev-port.mjs";
+import { pickDevPorts, resolveLocalBinCommand, getRepoRoot } from "./dev-port.mjs";
 
 const repoRoot = getRepoRoot();
 const tauriConfigPath = path.join(repoRoot, "src-tauri", "tauri.conf.json");
@@ -79,6 +79,8 @@ const env = {
   ...process.env,
   JAS_DEV_PORT: String(port),
   JAS_HMR_PORT: String(hmrPort),
+  // 桌面端需要端口固定，否则 devUrl 与实际监听端口不一致会导致空白窗口/热重载失效。
+  JAS_STRICT_PORT: "1",
 };
 
 const tauriConfig = readJson(tauriConfigPath);
@@ -101,7 +103,10 @@ process.on("SIGINT", () => shutdown(0));
 process.on("SIGTERM", () => shutdown(0));
 process.on("exit", () => cleanupDevConfig());
 
-vite = spawn(resolveLocalBin("vite"), [], { stdio: "inherit", env });
+{
+  const { cmd, args } = resolveLocalBinCommand("vite");
+  vite = spawn(cmd, args, { stdio: "inherit", env });
+}
 
 vite.on("exit", (code) => {
   if (tauri && !tauri.killed) killChild(tauri);
@@ -116,10 +121,13 @@ try {
   shutdown(1);
 }
 
-tauri = spawn(resolveLocalBin("tauri"), ["dev", "--config", devConfigPath, ...forwardedTauriArgs], {
-  stdio: "inherit",
-  env,
-});
+{
+  const { cmd, args } = resolveLocalBinCommand("tauri");
+  tauri = spawn(cmd, [...args, "dev", "--config", devConfigPath, ...forwardedTauriArgs], {
+    stdio: "inherit",
+    env,
+  });
+}
 
 tauri.on("exit", (code) => {
   if (vite && !vite.killed) killChild(vite);

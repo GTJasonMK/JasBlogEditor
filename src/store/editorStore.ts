@@ -1,37 +1,32 @@
 import { create } from 'zustand';
-import { invokeTauri, getWindowState, setMiniModeWindow, restoreNormalWindow, getCurrentMiniModeSettings } from '@/platform/tauri';
+import { invokeTauri } from '@/platform/tauri';
 import { parseMarkdownContent, serializeMarkdownContent, serializeDocContent } from '@/services/contentParser';
-import type { ContentType, EditorFile, NoteMetadata, ProjectMetadata, RoadmapMetadata, GraphMetadata, DocMetadata, WindowState } from '@/types';
+import { buildDocFilePath, buildJasblogFilePath, createNewDocMarkdown, createNewJasblogMarkdown } from '@/services/contentTemplates';
+import type { ContentType, EditorFile, NoteMetadata, ProjectMetadata, RoadmapMetadata, GraphMetadata, DocMetadata, JasBlogContentType } from '@/types';
 
 type Metadata = NoteMetadata | ProjectMetadata | RoadmapMetadata | GraphMetadata | DocMetadata;
 
-// 迷你模式默认配置
-const DEFAULT_MINI_MODE = { width: 450, height: 350 };
+export type EditorViewMode = 'edit' | 'preview' | 'split';
 
 interface EditorState {
   currentFile: EditorFile | null;
   isLoading: boolean;
   error: string | null;
-  viewMode: 'edit' | 'preview' | 'split';
-  miniMode: boolean;
-  savedWindowState: WindowState | null;
+  viewMode: EditorViewMode;
 
   openFile: (path: string, type: ContentType) => Promise<void>;
   closeFile: () => void;
   updateContent: (content: string) => void;
   updateMetadata: (metadata: Partial<Metadata>) => void;
   saveFile: () => Promise<void>;
-  createNewFile: (workspacePath: string, type: Exclude<ContentType, 'doc'>, filename: string) => Promise<string>;
+  createNewFile: (workspacePath: string, type: JasBlogContentType, filename: string) => Promise<string>;
   createDocFile: (workspacePath: string, relativePath: string) => Promise<string>;
   createFolder: (workspacePath: string, relativePath: string) => Promise<void>;
   deleteCurrentFile: () => Promise<void>;
   deleteFile: (path: string) => Promise<void>;
   renameFile: (oldPath: string, newPath: string) => Promise<void>;
-  setViewMode: (mode: 'edit' | 'preview' | 'split') => void;
+  setViewMode: (mode: EditorViewMode) => void;
   clearError: () => void;
-  enterMiniMode: () => Promise<void>;
-  exitMiniMode: () => Promise<void>;
-  toggleMiniMode: () => Promise<void>;
 }
 
 export const useEditorStore = create<EditorState>((set, get) => ({
@@ -39,14 +34,12 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   isLoading: false,
   error: null,
   viewMode: 'edit',
-  miniMode: false,
-  savedWindowState: null,
 
   openFile: async (path, type) => {
     set({ isLoading: true, error: null });
 
     try {
-      const content = await invokeTauri<string>('read_file', { path });
+      const content = await invokeTauri('read_file', { path });
       const name = path.split(/[/\\]/).pop() || '';
 
       // 所有类型都使用 Markdown 解析
@@ -144,66 +137,8 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     set({ isLoading: true, error: null });
 
     try {
-      const dirMap: Record<Exclude<ContentType, 'doc'>, string> = {
-        note: 'notes',
-        project: 'projects',
-        roadmap: 'roadmaps',
-        graph: 'graphs',
-      };
-
-      const dir = dirMap[type];
-      const path = `${workspacePath}/content/${dir}/${filename}.md`;
-
-      let content: string;
-      const today = new Date().toISOString().split('T')[0];
-
-      if (type === 'note') {
-        content = `---
-title: ${filename}
-date: ${today}
-excerpt:
-tags: []
----
-
-`;
-      } else if (type === 'project') {
-        content = `---
-title: ${filename}
-description:
-github:
-tags: []
-status: active
----
-
-## 项目介绍
-
-`;
-      } else if (type === 'roadmap') {
-        content = `---
-title: ${filename}
-description:
-status: active
----
-
-- [ ] 示例任务
-`;
-      } else {
-        // graph 类型：使用 Markdown + graph 代码块格式
-        content = `---
-name: ${filename}
-description:
-date: ${today}
----
-
-\`\`\`graph
-{
-  "nodes": [],
-  "edges": []
-}
-\`\`\`
-`;
-      }
-
+      const path = buildJasblogFilePath(workspacePath, type, filename);
+      const content = createNewJasblogMarkdown(type, filename);
       await invokeTauri('create_file', { path, content });
       set({ isLoading: false });
       return path;
@@ -218,18 +153,8 @@ date: ${today}
     set({ isLoading: true, error: null });
 
     try {
-      // 确保路径以 .md 结尾
-      const filePath = relativePath.endsWith('.md') ? relativePath : `${relativePath}.md`;
-      const path = `${workspacePath}/${filePath}`;
-      const filename = filePath.split(/[/\\]/).pop()?.replace('.md', '') || 'untitled';
-      const today = new Date().toISOString().split('T')[0];
-
-      const content = `---
-title: ${filename}
-date: ${today}
----
-
-`;
+      const path = buildDocFilePath(workspacePath, relativePath);
+      const content = createNewDocMarkdown(relativePath);
 
       await invokeTauri('create_file', { path, content });
       set({ isLoading: false });
@@ -325,63 +250,5 @@ date: ${today}
 
   clearError: () => {
     set({ error: null });
-  },
-
-  enterMiniMode: async () => {
-    const { currentFile, miniMode } = get();
-    if (!currentFile || miniMode) return;
-
-    try {
-      // 保存当前窗口状态
-      const windowState = await getWindowState();
-      set({ savedWindowState: windowState });
-
-      // 获取用户上次保存的迷你模式设置
-      const { useSettingsStore } = await import('./settingsStore');
-      const savedSettings = useSettingsStore.getState().settings.miniModeSettings;
-
-      // 验证保存的设置是否合理（宽度应小于 1000，位置应小于 5000）
-      let miniModeSettings = DEFAULT_MINI_MODE;
-      if (savedSettings && savedSettings.width < 1000 && savedSettings.height < 1000) {
-        if (savedSettings.positionX === undefined || savedSettings.positionX < 5000) {
-          miniModeSettings = savedSettings;
-        }
-      }
-
-      // 设置迷你模式窗口
-      await setMiniModeWindow(miniModeSettings);
-      set({ miniMode: true });
-    } catch (error) {
-      console.error('[MiniMode] 进入迷你模式失败:', error);
-      set({ error: `进入迷你模式失败: ${error}` });
-    }
-  },
-
-  exitMiniMode: async () => {
-    const { miniMode, savedWindowState } = get();
-    if (!miniMode || !savedWindowState) return;
-
-    try {
-      // 保存当前迷你模式的位置和大小
-      const currentMiniSettings = await getCurrentMiniModeSettings();
-      const { useSettingsStore } = await import('./settingsStore');
-      await useSettingsStore.getState().saveMiniModeSettings(currentMiniSettings);
-
-      // 恢复正常窗口
-      await restoreNormalWindow(savedWindowState);
-      set({ miniMode: false, savedWindowState: null });
-    } catch (error) {
-      console.error('退出迷你模式失败:', error);
-      set({ error: `退出迷你模式失败: ${error}` });
-    }
-  },
-
-  toggleMiniMode: async () => {
-    const { miniMode, enterMiniMode, exitMiniMode } = get();
-    if (miniMode) {
-      await exitMiniMode();
-    } else {
-      await enterMiniMode();
-    }
   },
 }));

@@ -1,5 +1,5 @@
 import { spawn } from "node:child_process";
-import { pickDevPorts, resolveLocalBin } from "./dev-port.mjs";
+import { pickDevPorts, resolveLocalBinCommand } from "./dev-port.mjs";
 
 const forwardedArgs = process.argv.slice(2);
 const { port, hmrPort, fallback } = await pickDevPorts({ needsHmrPort: false });
@@ -14,9 +14,12 @@ const env = {
   ...process.env,
   JAS_DEV_PORT: String(port),
   JAS_HMR_PORT: String(hmrPort),
+  // Web 模式允许 Vite 自动切换端口（strictPort=false）。
+  JAS_STRICT_PORT: "0",
 };
 
-const vite = spawn(resolveLocalBin("vite"), forwardedArgs, {
+const { cmd, args } = resolveLocalBinCommand("vite");
+const vite = spawn(cmd, [...args, ...forwardedArgs], {
   stdio: "inherit",
   env,
 });

@@ -12,6 +12,7 @@ JasBlogEditor 是一个桌面博客内容编辑器，基于 Tauri 2 (Rust 后端
 # 开发
 npm run dev          # 启动 Vite 开发服务器（默认从 1422 起自动找空闲端口）
 npm run dev:app      # 启动桌面应用（自动找空闲端口并同步给 Tauri）
+npm run tauri dev    # 等价于 dev:app（拦截 dev 子命令，自动找空闲端口）
 npm run kill:devport # 结束占用默认开发端口的监听进程（谨慎）
 
 # 构建

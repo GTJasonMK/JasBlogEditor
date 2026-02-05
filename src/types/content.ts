@@ -11,6 +11,35 @@ export type ThemeMode = 'light' | 'dark' | 'system';
 // 内容类型枚举
 export type ContentType = 'note' | 'project' | 'roadmap' | 'graph' | 'doc';
 
+// JasBlog 内容类型（content/ 下的固定四类）
+export const JASBLOG_CONTENT_TYPES = ['note', 'project', 'roadmap', 'graph'] as const;
+export type JasBlogContentType = (typeof JASBLOG_CONTENT_TYPES)[number];
+
+// 内容类型中文标签（用于 UI 显示）
+export const CONTENT_TYPE_LABELS: Record<ContentType, string> = {
+  note: '笔记',
+  project: '项目',
+  roadmap: '规划',
+  graph: '图谱',
+  doc: '文档',
+};
+
+// JasBlog 左侧栏分组名称（比内容类型标签更贴近站点语义）
+export const JASBLOG_SECTION_LABELS: Record<JasBlogContentType, string> = {
+  note: '学习笔记',
+  project: '开源项目',
+  roadmap: '我的规划',
+  graph: '知识图谱',
+};
+
+// JasBlog 左侧栏分组图标（Heroicons path）
+export const JASBLOG_SECTION_ICONS: Record<JasBlogContentType, string> = {
+  note: 'M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z',
+  project: 'M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z',
+  roadmap: 'M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01',
+  graph: 'M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1',
+};
+
 // 通用元数据接口
 export interface BaseMetadata {
   title: string;
@@ -231,7 +260,7 @@ export interface WindowState {
 }
 
 // 目录映射（仅 JasBlog 模式使用）
-export const CONTENT_DIRS: Record<Exclude<ContentType, 'doc'>, string> = {
+export const CONTENT_DIRS: Record<JasBlogContentType, string> = {
   note: 'notes',
   project: 'projects',
   roadmap: 'roadmaps',
