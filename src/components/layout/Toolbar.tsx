@@ -8,6 +8,7 @@ import { NewMenu } from './toolbar/NewMenu';
 import { ThemeMenu } from './toolbar/ThemeMenu';
 import { ViewModeToggle } from './toolbar/ViewModeToggle';
 import { ErrorToast } from './toolbar/ErrorToast';
+import { HelpModal } from './toolbar/HelpModal';
 
 export function Toolbar() {
   const {
@@ -35,6 +36,7 @@ export function Toolbar() {
   } = useEditorStore();
   const { toggleMiniMode, error: windowError, clearError: clearWindowError } = useWindowStore();
   const [localError, setLocalError] = useState<string | null>(null);
+  const [helpOpen, setHelpOpen] = useState(false);
 
   const currentTheme = settings.theme || 'system';
   const effectiveTheme = getEffectiveTheme(currentTheme);
@@ -198,6 +200,17 @@ export function Toolbar() {
         {/* 主题切换 */}
         <ThemeMenu currentTheme={currentTheme} effectiveTheme={effectiveTheme} onSetTheme={handleSetTheme} />
 
+        {/* 帮助 */}
+        <button
+          onClick={() => setHelpOpen(true)}
+          className="flex items-center gap-1 px-2 py-1.5 text-sm text-[var(--color-text-muted)] hover:text-[var(--color-text)] hover:bg-[var(--color-surface)] rounded-md transition-colors"
+          title="渲染帮助"
+        >
+          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.227 9a3 3 0 115.546 0c0 1.5-1.5 2-1.5 2.75V13m0 4h.01M12 3a9 9 0 100 18 9 9 0 000-18z" />
+          </svg>
+        </button>
+
         {/* 迷你模式切换 */}
         {currentFile && (
           <button
@@ -224,6 +237,8 @@ export function Toolbar() {
       {displayError && (
         <ErrorToast message={displayError} onDismiss={handleDismissError} />
       )}
+
+      <HelpModal open={helpOpen} onClose={() => setHelpOpen(false)} />
     </>
   );
 }
