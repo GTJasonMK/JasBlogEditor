@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useSettingsStore, useFileStore, useEditorStore, useWindowStore } from '@/store';
-import { openFolderDialog } from '@/platform/tauri';
+import { confirmDialog, openFolderDialog } from '@/platform/tauri';
 import { applyTheme, getEffectiveTheme } from '@/utils';
 import type { ThemeMode } from '@/types';
 import type { JasBlogContentType } from '@/types';
@@ -32,7 +32,7 @@ export function Toolbar() {
     openFile,
     createFolder,
     createNewFile,
-    deleteCurrentFile,
+    deleteFile,
   } = useEditorStore();
   const { toggleMiniMode, error: windowError, clearError: clearWindowError } = useWindowStore();
   const [localError, setLocalError] = useState<string | null>(null);
@@ -118,10 +118,17 @@ export function Toolbar() {
 
   const handleDelete = async () => {
     if (!currentFile) return;
-    if (!confirm(`确定要删除 ${currentFile.name} 吗?`)) return;
+    const file = currentFile;
+    const confirmed = await confirmDialog(`确定要删除 "${file.name}" 吗?`, {
+      title: '删除文件',
+      kind: 'warning',
+      okLabel: '删除',
+      cancelLabel: '取消',
+    });
+    if (!confirmed) return;
 
     try {
-      await deleteCurrentFile();
+      await deleteFile(file.path);
       await refreshFileTree();
     } catch (error) {
       // 错误已在 store 中处理

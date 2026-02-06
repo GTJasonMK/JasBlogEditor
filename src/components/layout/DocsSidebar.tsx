@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useFileStore, useEditorStore } from '@/store';
 import { DocsTreeItem } from './DocsTreeItem';
 import type { FileTreeNode } from '@/store/fileStore';
+import { confirmDialog } from '@/platform/tauri';
 import { renameSiblingPath } from '@/utils';
 import { FileContextMenu } from './sidebar/FileContextMenu';
 import { RenameDialog } from './sidebar/RenameDialog';
@@ -38,13 +39,20 @@ export function DocsSidebar() {
   };
 
   const handleDelete = async () => {
-    if (!contextMenu.file) return;
-    const confirmed = confirm(`确定要删除 "${contextMenu.file.name}" 吗?`);
+    const file = contextMenu.file;
+    if (!file) return;
+
+    setContextMenu((prev) => ({ ...prev, visible: false }));
+    const confirmed = await confirmDialog(`确定要删除 "${file.name}" 吗?`, {
+      title: '删除文件',
+      kind: 'warning',
+      okLabel: '删除',
+      cancelLabel: '取消',
+    });
     if (!confirmed) return;
 
-    setContextMenu(prev => ({ ...prev, visible: false }));
     try {
-      await deleteFile(contextMenu.file.path);
+      await deleteFile(file.path);
       await refreshFileTree();
     } catch (error) {
       // 错误已在 store 中处理

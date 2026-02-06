@@ -1,4 +1,4 @@
-import type { OpenDialogOptions } from "@tauri-apps/plugin-dialog";
+import type { ConfirmDialogOptions, OpenDialogOptions } from "@tauri-apps/plugin-dialog";
 import { isTauri } from "./runtime";
 import type { MiniModeSettings, WindowState } from "@/types";
 import type { RustFileInfo, RustSettings } from "./tauriTypes";
@@ -45,6 +45,25 @@ export async function openFolderDialog(options?: OpenDialogOptions): Promise<str
   });
   if (typeof result === "string") return result;
   return null;
+}
+
+/**
+ * 统一确认对话框
+ *
+ * 说明：
+ * - Tauri 环境：使用 `@tauri-apps/plugin-dialog` 的原生弹窗（异步）
+ * - Web 环境：回退到 `window.confirm`（同步），这里包装成 Promise 统一调用方式
+ */
+export async function confirmDialog(
+  message: string,
+  options?: string | ConfirmDialogOptions,
+): Promise<boolean> {
+  if (isTauri()) {
+    const { confirm } = await import("@tauri-apps/plugin-dialog");
+    return confirm(message, options);
+  }
+
+  return window.confirm(message);
 }
 
 export async function readTextFile(filePath: string): Promise<string> {
