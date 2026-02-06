@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { useFileStore, useEditorStore } from '@/store';
 import { DocsTreeItem } from './DocsTreeItem';
 import type { FileTreeNode } from '@/store/fileStore';
-import { confirmDialog } from '@/platform/tauri';
+import { confirmDialog } from '@/utils/confirmDialog';
 import { renameSiblingPath } from '@/utils';
 import { FileContextMenu } from './sidebar/FileContextMenu';
 import { RenameDialog } from './sidebar/RenameDialog';

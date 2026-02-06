@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useSettingsStore, useFileStore, useEditorStore, useWindowStore } from '@/store';
-import { confirmDialog, openFolderDialog } from '@/platform/tauri';
+import { openFolderDialog } from '@/platform/tauri';
+import { confirmDialog } from '@/utils/confirmDialog';
 import { applyTheme, getEffectiveTheme } from '@/utils';
 import type { ThemeMode } from '@/types';
 import type { JasBlogContentType } from '@/types';

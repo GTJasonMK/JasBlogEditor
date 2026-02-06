@@ -3,7 +3,7 @@ import { useFileStore, useEditorStore } from '@/store';
 import type { FileTreeNode } from '@/store/fileStore';
 import { CONTENT_DIRS, JASBLOG_CONTENT_TYPES, JASBLOG_SECTION_ICONS, JASBLOG_SECTION_LABELS } from '@/types';
 import type { JasBlogContentType } from '@/types';
-import { confirmDialog } from '@/platform/tauri';
+import { confirmDialog } from '@/utils/confirmDialog';
 import { renameSiblingPath } from '@/utils';
 import { FileContextMenu } from './sidebar/FileContextMenu';
 import { RenameDialog } from './sidebar/RenameDialog';
