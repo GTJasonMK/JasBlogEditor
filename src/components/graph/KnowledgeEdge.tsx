@@ -108,7 +108,7 @@ function KnowledgeEdge({
             className={`px-2 py-0.5 text-[10px] font-medium rounded-full transition-all duration-150
               ${selected
                 ? "bg-[var(--color-vermilion)] text-white shadow-md"
-                : "bg-[var(--color-paper)] text-[var(--color-gray)] border border-[var(--color-border)] hover:border-[var(--color-vermilion)] hover:text-[var(--color-vermilion)]"
+                : "bg-white text-[var(--color-gray)] border border-[var(--color-border)] hover:border-[var(--color-vermilion)] hover:text-[var(--color-vermilion)]"
               }
             `}
           >

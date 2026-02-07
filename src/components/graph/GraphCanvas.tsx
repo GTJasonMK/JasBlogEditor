@@ -200,7 +200,7 @@ function GraphCanvasInner({ data, selectedNode, onNodeSelect, showMinimap = true
         />
         <Controls
           showInteractive={false}
-          className="!bg-[var(--color-paper)] !border-[var(--color-border)] !shadow-md"
+          className="!bg-white !border-[var(--color-border)] !shadow-md"
         />
         {showMinimap && (
           <MiniMap
@@ -208,7 +208,7 @@ function GraphCanvasInner({ data, selectedNode, onNodeSelect, showMinimap = true
             nodeStrokeWidth={2}
             zoomable
             pannable
-            className="!bg-[var(--color-paper)] !border-[var(--color-border)]"
+            className="!bg-white !border-[var(--color-border)]"
           />
         )}
       </ReactFlow>

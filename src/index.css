@@ -23,8 +23,14 @@
   --color-text: #2c2c2c;
   --color-text-muted: #4a4a4a;
   --color-text-subtle: #6b6b6b;
+  --color-ink: #2c2c2c;
+  --color-ink-light: #4a4a4a;
   --color-gray: #6b6b6b;
   --color-gray-light: #999;
+
+  --color-vermilion: #c94043;
+  --color-vermilion-dark: #a33235;
+  --color-gold: #b8860b;
 
   /* 边框颜色 */
   --color-border: #e8e0d0;
@@ -72,8 +78,14 @@
   --color-text: #e8e6e3;
   --color-text-muted: #b8b5b0;
   --color-text-subtle: #8a8680;
+  --color-ink: #e8e6e3;
+  --color-ink-light: #b8b5b0;
   --color-gray: #8a8680;
   --color-gray-light: #6b6765;
+
+  --color-vermilion: #c94043;
+  --color-vermilion-dark: #a33235;
+  --color-gold: #b8860b;
 
   --color-border: #2e2e32;
   --color-border-light: #252528;
@@ -108,6 +120,10 @@ body {
 ::selection {
   background-color: var(--color-primary);
   color: white;
+}
+
+a {
+  text-decoration: none;
 }
 
 /* 全局滚动条样式 */
@@ -882,6 +898,47 @@ body {
    JasBlog 组件样式
    ======================================== */
 
+/* 印章效果 */
+.seal {
+  display: inline-block;
+  color: var(--color-vermilion);
+  border: 2px solid var(--color-vermilion);
+  padding: 6px 12px;
+  font-weight: 700;
+  font-size: 1.1rem;
+  letter-spacing: 0.1em;
+}
+
+/* 章节标题下划线 */
+.section-title {
+  position: relative;
+  display: inline-block;
+}
+
+.section-title::after {
+  content: '';
+  position: absolute;
+  bottom: -4px;
+  left: 0;
+  width: 100%;
+  height: 2px;
+  background: linear-gradient(90deg, var(--color-vermilion), transparent);
+}
+
+/* 文章卡片 */
+.card-hover {
+  box-shadow: var(--shadow-sm);
+  border: 1px solid var(--color-paper-darker);
+  background: #fff;
+  transition: transform 0.2s, box-shadow 0.2s, border-color 0.2s;
+}
+
+.card-hover:hover {
+  transform: translateY(-4px);
+  box-shadow: var(--shadow-lg);
+  border-color: var(--color-vermilion);
+}
+
 /* 云纹分割线 */
 .divider-cloud {
   height: 24px;
@@ -898,10 +955,36 @@ body {
   background: var(--color-paper-dark);
   color: var(--color-gray);
   border-radius: 20px;
-  transition: background-color 0.2s, color 0.2s;
 }
 
-.tag:hover {
-  background: var(--color-primary);
+/* 主按钮 */
+.btn-primary {
+  display: inline-block;
+  padding: 10px 24px;
+  background: var(--color-vermilion);
   color: white;
+  border-radius: 6px;
+  font-weight: 500;
+}
+
+.btn-primary:hover {
+  background: var(--color-vermilion-dark);
+}
+
+/* 目录滚动条 */
+.toc-scrollbar::-webkit-scrollbar {
+  width: 4px;
+}
+
+.toc-scrollbar::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.toc-scrollbar::-webkit-scrollbar-thumb {
+  background: var(--color-paper-darker);
+  border-radius: 2px;
+}
+
+.toc-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: var(--color-gray-light);
 }

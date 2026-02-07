@@ -61,7 +61,7 @@ export function MarkdownEditor() {
   );
 
   const renderPreview = () => (
-    <div className="w-full h-full p-6 overflow-auto bg-[var(--color-paper)]">
+    <div className="w-full h-full overflow-auto bg-[var(--color-paper)]">
       <ContentPreview file={currentFile} bodyContent={bodyContent} />
     </div>
   );

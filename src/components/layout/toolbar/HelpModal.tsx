@@ -401,17 +401,26 @@ export function HelpModal({ open, onClose }: HelpModalProps) {
     const roadmapBodyExample = [
       '这里是规划说明（非任务内容，会按 Markdown 渲染）。',
       '',
+      '## 任务列表',
+      '',
       '- [-] 搭建编辑器骨架 `high`',
-      '  支持打开/保存',
+      '  描述: 支持打开/保存',
+      '  详情:',
+      '    - 需要同时覆盖桌面与迷你模式',
+      '    - 包含端口冲突自动处理',
       '  截止: 2026-06-01',
       '',
       '- [ ] 增加帮助文档面板 `medium`',
-      '  需要分 Tab 展示',
+      '  描述: 需要分 Tab 展示',
+      '  详情:',
+      '    - 增加搜索框',
+      '    - 增加章节目录锚点',
+      '    - 按渲染能力分组说明',
       '',
       '- [x] 修复端口冲突 `low`',
+      '  描述: 兼容 start.bat 启动流程',
       '  完成: 2026-02-05',
     ].join('\n');
-
     const graphBodyExample = [
       '```graph',
       '{',
@@ -752,15 +761,16 @@ export function HelpModal({ open, onClose }: HelpModalProps) {
       {
         id: 'roadmap',
         label: 'Roadmap 任务',
-        keywords: ['roadmap', '任务', '规划', '截止', '完成', 'priority'],
+        keywords: ['roadmap', '任务', '规划', '截止', '完成', 'priority', '描述', '详情'],
         render: () => (
           <div>
             <Section id="roadmap-support" title="渲染规则（仅 roadmap 类型预览生效）">
               <ul className="text-sm text-[var(--color-text)] list-disc pl-5 space-y-1">
                 <li>任务行：<code className="font-mono">- [ ]</code>（todo） / <code className="font-mono">- [-]</code>（in progress） / <code className="font-mono">- [x]</code>（done）</li>
                 <li>优先级（可选）：行末 <code className="font-mono">`high|medium|low`</code></li>
-                <li>描述与字段：缩进（2 个空格或 Tab）行会被视为任务详情</li>
+                <li>描述与详情：缩进（至少 2 个空格）行会被视为任务内容；支持 <code className="font-mono">描述:</code> 与 <code className="font-mono">详情:</code> 标签。</li>
                 <li>字段行：<code className="font-mono">截止: ...</code>、<code className="font-mono">完成: ...</code></li>
+                <li>正文中的“任务列表”标题（如 <code className="font-mono">## 任务列表</code>）会自动从正文区移除，避免重复展示。</li>
                 <li>不符合任务格式的内容会保留为正文 Markdown 渲染</li>
               </ul>
             </Section>
@@ -785,6 +795,8 @@ export function HelpModal({ open, onClose }: HelpModalProps) {
                 <li>任务优先级不写时默认 <code className="font-mono">medium</code>，仅支持 <code className="font-mono">high/medium/low</code>。</li>
                 <li>只有缩进行（2 空格或 Tab）才会归属到当前任务描述；未缩进行会被视为普通正文。</li>
                 <li><code className="font-mono">截止:</code>、<code className="font-mono">完成:</code> 只在任务缩进内生效，其他位置会按普通文本渲染。</li>
+                <li><code className="font-mono">详情:</code> 后续的缩进行会归入任务详情，适合写多行说明或列表。</li>
+                <li>当正文已解析出任务项时，独立的“任务列表”标题会自动清理，正文区仅保留非任务说明。</li>
                 <li>无法匹配任务格式的内容不会丢失，会保留到正文区域继续 Markdown 渲染。</li>
               </ul>
             </Section>

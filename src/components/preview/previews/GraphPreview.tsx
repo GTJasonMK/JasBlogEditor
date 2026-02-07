@@ -14,10 +14,23 @@ export function GraphPreview({ metadata, content }: GraphPreviewProps) {
   const { graphData, remainingContent } = extractGraphFromContent(content);
 
   return (
-    <div className="h-full flex flex-col">
-      {/* 头部信息 */}
-      <header className="flex-shrink-0 mb-8">
-        <h1 className="text-2xl font-bold mb-2 text-[var(--color-text)]">{metadata.name}</h1>
+    <div className="max-w-6xl mx-auto px-6 py-12">
+      <span className="inline-flex items-center gap-1 text-[var(--color-gray)] mb-6 transition-colors">
+        <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+          <path
+            d="M10 12L6 8L10 4"
+            stroke="currentColor"
+            strokeWidth="1.5"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          />
+        </svg>
+        返回图谱列表
+      </span>
+
+      {/* 标题 */}
+      <header className="mb-8">
+        <h1 className="text-2xl font-bold mb-2">{metadata.name}</h1>
         {metadata.description && (
           <p className="text-[var(--color-gray)] mb-2">{metadata.description}</p>
         )}
@@ -29,34 +42,19 @@ export function GraphPreview({ metadata, content }: GraphPreviewProps) {
         </p>
       </header>
 
-      {/* 操作提示 */}
-      <div className="flex-shrink-0 mb-6 p-4 bg-[var(--color-paper-dark)] rounded-lg text-sm">
+      {/* 使用说明 */}
+      <div className="mb-6 p-4 bg-[var(--color-paper-dark)] rounded-lg text-sm">
         <p className="text-[var(--color-gray)]">
           <strong>操作提示：</strong>
           滚轮缩放 · 拖拽平移 · 点击节点查看详情 · 右下角小地图导航
         </p>
       </div>
 
-      {/* 图谱可视化 */}
-      <div className="flex-1 min-h-[400px]">
-        {graphData.nodes.length > 0 ? (
-          <GraphViewer data={graphData} />
-        ) : (
-          <div className="w-full h-full flex items-center justify-center bg-[var(--color-paper)] rounded-lg border border-[var(--color-border)]">
-            <div className="text-center text-[var(--color-gray)]">
-              <svg className="w-16 h-16 mx-auto mb-4 opacity-30" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
-                <circle cx="12" cy="12" r="10" />
-                <path d="M8 12h.01M12 12h.01M16 12h.01" />
-              </svg>
-              <p>暂无节点数据</p>
-              <p className="text-sm mt-1">在 graph 代码块中添加节点后即可预览图谱</p>
-            </div>
-          </div>
-        )}
-      </div>
+      {/* 图谱查看器 */}
+      <GraphViewer data={graphData} />
 
       {/* 正文内容 */}
-      {remainingContent && (
+      {remainingContent.trim() && (
         <article className="prose-chinese mt-8">
           <MarkdownRenderer content={remainingContent} />
         </article>
@@ -64,4 +62,3 @@ export function GraphPreview({ metadata, content }: GraphPreviewProps) {
     </div>
   );
 }
-

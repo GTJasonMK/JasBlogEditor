@@ -17,7 +17,7 @@ export default function GraphViewer({ data }: GraphViewerProps) {
   const [showMinimap, setShowMinimap] = useState(true);
 
   return (
-    <div className="flex gap-4 h-full">
+    <div className="flex gap-4 h-[600px]">
       {/* 图谱画布区域 - 自适应宽度 */}
       <div className="flex-1 relative rounded-lg overflow-hidden border border-[var(--color-border)]">
         <GraphCanvas
@@ -30,7 +30,7 @@ export default function GraphViewer({ data }: GraphViewerProps) {
         {/* 左上角信息区域 */}
         <div className="absolute top-4 left-4 flex flex-col gap-2 z-10">
           {/* 统计信息 */}
-          <div className="bg-[var(--color-paper)]/90 backdrop-blur-sm rounded-lg px-3 py-2 text-sm border border-[var(--color-border)] shadow-sm">
+          <div className="bg-white/90 backdrop-blur-sm rounded-lg px-3 py-2 text-sm border border-[var(--color-border)] shadow-sm">
             <span className="text-[var(--color-gray)]">
               {data.nodes.length} 个节点 · {data.edges.length} 条连接
             </span>
@@ -38,7 +38,7 @@ export default function GraphViewer({ data }: GraphViewerProps) {
 
           {/* 提示信息 */}
           {!selectedNode && (
-            <div className="bg-[var(--color-paper)]/90 backdrop-blur-sm rounded-lg px-3 py-2 text-sm border border-[var(--color-border)] shadow-sm">
+            <div className="bg-white/90 backdrop-blur-sm rounded-lg px-3 py-2 text-sm border border-[var(--color-border)] shadow-sm">
               <span className="text-[var(--color-gray)]">
                 点击节点查看详情
               </span>
@@ -49,7 +49,7 @@ export default function GraphViewer({ data }: GraphViewerProps) {
         {/* 小地图切换按钮 */}
         <button
           onClick={() => setShowMinimap(!showMinimap)}
-          className="absolute bottom-4 right-4 bg-[var(--color-paper)]/90 backdrop-blur-sm rounded-lg px-3 py-2 text-sm border border-[var(--color-border)] shadow-sm z-10 hover:bg-[var(--color-paper)] transition-colors"
+          className="absolute bottom-4 right-4 bg-white/90 backdrop-blur-sm rounded-lg px-3 py-2 text-sm border border-[var(--color-border)] shadow-sm z-10 hover:bg-white transition-colors"
           title={showMinimap ? "隐藏小地图" : "显示小地图"}
         >
           <span className="text-[var(--color-gray)]">

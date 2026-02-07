@@ -159,6 +159,14 @@ function normalizeRoadmapStatus(value: unknown): 'active' | 'completed' | 'pause
  *
  * 返回任务列表和剩余的非任务内容
  */
+function stripTaskListHeading(content: string): string {
+  const filteredLines = content
+    .split('\n')
+    .filter((line) => !/^(#{1,6}\s*)?任务列表[:：]?\s*$/.test(line.trim()));
+
+  return filteredLines.join('\n').replace(/\n{3,}/g, '\n\n').trim();
+}
+
 export function parseRoadmapItemsFromContent(content: string): { items: RoadmapItem[]; remainingContent: string } {
   const lines = content.split('\n');
   const items: RoadmapItem[] = [];
@@ -166,25 +174,35 @@ export function parseRoadmapItemsFromContent(content: string): { items: RoadmapI
 
   let currentItem: RoadmapItem | null = null;
   let currentDescription: string[] = [];
+  let currentDetails: string[] = [];
+  let isCollectingDetails = false;
   let itemId = 1;
 
   // 任务行正则：- [ ] 或 - [-] 或 - [x] 开头，后面是标题，可选 `priority`
   const taskRegex = /^-\s*\[([ x\-])\]\s+(.+?)(?:\s+`(high|medium|low)`)?\s*$/;
   // 缩进行正则（至少2个空格）
-  const indentRegex = /^(\s{2,}|\t)(.+)$/;
+  const indentRegex = /^(\s{2,})(.+)$/;
   // 截止日期正则
   const deadlineRegex = /^截止[:：]\s*(.+)$/;
   // 完成日期正则
   const completedAtRegex = /^完成[:：]\s*(.+)$/;
+  // 描述和详情正则
+  const descriptionLabelRegex = /^描述[:：]\s*(.*)$/;
+  const detailsLabelRegex = /^详情[:：]\s*(.*)$/;
 
   const saveCurrentItem = () => {
     if (currentItem) {
       if (currentDescription.length > 0) {
         currentItem.description = currentDescription.join('\n').trim();
       }
+      if (currentDetails.length > 0) {
+        currentItem.details = currentDetails.join('\n').trim();
+      }
       items.push(currentItem);
       currentItem = null;
       currentDescription = [];
+      currentDetails = [];
+      isCollectingDetails = false;
     }
   };
 
@@ -214,16 +232,43 @@ export function parseRoadmapItemsFromContent(content: string): { items: RoadmapI
         const text = indentMatch[2];
         const deadlineMatch = text.match(deadlineRegex);
         const completedAtMatch = text.match(completedAtRegex);
+
         if (deadlineMatch) {
           currentItem.deadline = deadlineMatch[1].trim();
+          isCollectingDetails = false;
         } else if (completedAtMatch) {
           currentItem.completedAt = completedAtMatch[1].trim();
+          isCollectingDetails = false;
         } else {
-          currentDescription.push(text);
+          const descriptionLabelMatch = text.match(descriptionLabelRegex);
+          const detailsLabelMatch = text.match(detailsLabelRegex);
+
+          if (descriptionLabelMatch) {
+            const descriptionLine = descriptionLabelMatch[1].trim();
+            if (descriptionLine) {
+              currentDescription.push(descriptionLine);
+            }
+            isCollectingDetails = false;
+          } else if (detailsLabelMatch) {
+            const detailLine = detailsLabelMatch[1].trim();
+            if (detailLine) {
+              currentDetails.push(detailLine);
+            }
+            isCollectingDetails = true;
+          } else if (isCollectingDetails) {
+            currentDetails.push(text);
+          } else {
+            currentDescription.push(text);
+          }
         }
       } else if (line.trim() === '') {
         // 空行，可能是任务之间的分隔
         // 继续保持当前任务状态，允许多段描述
+        if (isCollectingDetails && currentDetails.length > 0) {
+          currentDetails.push('');
+        } else if (currentDescription.length > 0) {
+          currentDescription.push('');
+        }
       } else {
         // 非缩进的非空行，任务结束
         saveCurrentItem();
@@ -238,9 +283,11 @@ export function parseRoadmapItemsFromContent(content: string): { items: RoadmapI
   // 保存最后一个任务
   saveCurrentItem();
 
+  const rawRemainingContent = nonTaskLines.join('\n').trim();
+
   return {
     items,
-    remainingContent: nonTaskLines.join('\n').trim(),
+    remainingContent: items.length > 0 ? stripTaskListHeading(rawRemainingContent) : rawRemainingContent,
   };
 }
 
@@ -272,6 +319,18 @@ export function serializeRoadmapItemsToContent(items: RoadmapItem[]): string {
         lines.push(`  ${desc}`);
       }
     }
+
+    // 添加详情（可选）
+    if (item.details) {
+      const detailLines = item.details.split('\n');
+      if (detailLines.length > 0) {
+        lines.push(`  详情: ${detailLines[0]}`);
+        for (const detail of detailLines.slice(1)) {
+          lines.push(`  ${detail}`);
+        }
+      }
+    }
+
 
     // 添加截止日期
     if (item.deadline) {

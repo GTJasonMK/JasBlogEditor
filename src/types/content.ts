@@ -92,6 +92,7 @@ export interface RoadmapItem {
   title: string;
   description?: string;
   status: RoadmapItemStatus;
+  details?: string;
   priority: RoadmapPriority;  // 必填，默认 medium
   deadline?: string;
   completedAt?: string;

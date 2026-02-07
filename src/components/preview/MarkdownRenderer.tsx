@@ -1,4 +1,4 @@
-import { useState, useCallback, useMemo, type ReactNode } from "react";
+import { useState, useCallback, type ReactNode } from "react";
 import Markdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import remarkMath from "remark-math";
@@ -7,16 +7,6 @@ import rehypeKatex from "rehype-katex";
 import "katex/dist/katex.min.css";
 import { MermaidDiagram } from "./MermaidDiagram";
 import { extractText, generateId } from "@/utils";
-
-// 预处理 Alert 语法，将 > [!TYPE] 转换为特殊标记
-// 使用 ALERTBOXTYPEALERTBOX 格式避免被 Markdown 解析（与 JasBlog 保持一致）
-function preprocessAlerts(content: string): string {
-  // 处理 Windows (\r\n) 和 Unix (\n) 换行符
-  return content.replace(
-    /^(>\s*)\[!(NOTE|TIP|IMPORTANT|WARNING|CAUTION)\]\r?\n?/gm,
-    "$1ALERTBOX$2ALERTBOX\n"
-  );
-}
 
 // 代码块复制按钮组件
 function CopyButton({ code }: { code: string }) {
@@ -216,7 +206,7 @@ function CodeBlock({ children }: { children?: ReactNode }) {
 
   // 普通代码块
   return (
-    <div className="code-block-wrapper group">
+    <div className="code-block-wrapper">
       {language && <span className="code-block-lang">{language}</span>}
       <CopyButton code={code} />
       <pre>{children}</pre>
@@ -229,9 +219,6 @@ interface MarkdownRendererProps {
 }
 
 export function MarkdownRenderer({ content }: MarkdownRendererProps) {
-  // 预处理 Alert 语法
-  const processedContent = useMemo(() => preprocessAlerts(content), [content]);
-
   return (
     <Markdown
       remarkPlugins={[remarkGfm, remarkMath]}
@@ -312,7 +299,7 @@ export function MarkdownRenderer({ content }: MarkdownRendererProps) {
         ),
       }}
     >
-      {processedContent}
+      {content}
     </Markdown>
   );
 }

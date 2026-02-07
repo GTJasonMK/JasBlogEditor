@@ -18,7 +18,7 @@ export default function NodeDetailPanel({ node, onClose }: NodeDetailPanelProps)
   const edgeColorInfo = edgeColor ? edgeColorConfig[edgeColor] : null;
 
   return (
-    <div className="h-full flex flex-col bg-[var(--color-paper)] border-l border-[var(--color-border)]">
+    <div className="h-full flex flex-col bg-white border-l border-[var(--color-border)]">
       {/* 标题栏 */}
       <div
         className="px-4 py-4 flex items-center justify-between shrink-0"

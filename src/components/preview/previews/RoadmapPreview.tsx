@@ -10,21 +10,21 @@ interface RoadmapPreviewProps {
 // 任务状态配置
 const statusConfig: Record<string, { label: string; className: string }> = {
   todo: { label: '待开始', className: 'bg-gray-100 text-gray-600' },
-  in_progress: { label: '进行中', className: 'bg-[var(--color-primary)] text-white' },
+  in_progress: { label: '进行中', className: 'bg-[var(--color-vermilion)] text-white' },
   done: { label: '已完成', className: 'bg-green-100 text-green-700' },
 };
 
 // 规划状态配置
 const roadmapStatusConfig: Record<string, { label: string; className: string }> = {
-  active: { label: '进行中', className: 'bg-[var(--color-primary)] text-white' },
+  active: { label: '进行中', className: 'bg-[var(--color-vermilion)] text-white' },
   completed: { label: '已完成', className: 'bg-green-100 text-green-700' },
   paused: { label: '已暂停', className: 'bg-gray-100 text-gray-600' },
 };
 
 // 优先级配置
 const priorityConfig: Record<string, { className: string; label: string }> = {
-  high: { className: 'bg-[var(--color-primary)]', label: '高' },
-  medium: { className: 'bg-yellow-400', label: '中' },
+  high: { className: 'bg-[var(--color-vermilion)]', label: '高' },
+  medium: { className: 'bg-[var(--color-gold)]', label: '中' },
   low: { className: 'bg-gray-300', label: '低' },
 };
 
@@ -41,27 +41,44 @@ function PriorityIndicator({ priority }: { priority: RoadmapItem['priority'] }) 
 }
 
 function RoadmapItemCard({ item }: { item: RoadmapItem }) {
+  const hasDetailContent = Boolean(item.description || item.details || item.deadline || item.completedAt);
+
   return (
-    <div className="bg-[var(--color-paper)] rounded-lg p-5 border border-[var(--color-border)]">
-      <div className="flex items-start justify-between gap-4">
-        <div className="flex items-center gap-3">
-          <PriorityIndicator priority={item.priority} />
-          <h4 className="font-medium text-[var(--color-text)]">{item.title}</h4>
+    <details className="card-hover bg-white rounded-lg border border-[var(--color-paper-dark)]">
+      <summary className="list-none cursor-pointer p-5">
+        <div className="flex items-start justify-between gap-4">
+          <div className="flex items-center gap-3">
+            <PriorityIndicator priority={item.priority} />
+            <h4 className="font-medium">{item.title}</h4>
+          </div>
+          <StatusBadge status={item.status} />
         </div>
-        <StatusBadge status={item.status} />
-      </div>
-      {item.description && (
-        <p className="text-sm text-[var(--color-gray)] mt-2 ml-5">
-          {item.description}
+        <p className="text-xs text-[var(--color-gray)] mt-2 ml-5">
+          {hasDetailContent ? '点击查看详情' : '暂无详细信息'}
         </p>
-      )}
-      {(item.deadline || item.completedAt) && (
-        <div className="flex flex-wrap gap-4 text-xs text-[var(--color-gray)] mt-2 ml-5">
-          {item.deadline && <span>截止: {item.deadline}</span>}
-          {item.completedAt && <span className="text-green-600">完成: {item.completedAt}</span>}
+      </summary>
+
+      {hasDetailContent && (
+        <div className="px-5 pb-5 pt-0 ml-5">
+          {item.description && (
+            <p className="text-sm text-[var(--color-gray)]">{item.description}</p>
+          )}
+
+          {item.details && (
+            <div className="text-sm text-[var(--color-ink)] whitespace-pre-line mt-2">
+              {item.details}
+            </div>
+          )}
+
+          {(item.deadline || item.completedAt) && (
+            <div className="flex flex-wrap gap-4 text-xs text-[var(--color-gray)] mt-2">
+              {item.deadline && <span>截止: {item.deadline}</span>}
+              {item.completedAt && <span className="text-green-600">完成: {item.completedAt}</span>}
+            </div>
+          )}
         </div>
       )}
-    </div>
+    </details>
   );
 }
 
@@ -82,11 +99,24 @@ export function RoadmapPreview({ metadata, content }: RoadmapPreviewProps) {
   const roadmapStatusCfg = roadmapStatusConfig[roadmapStatus];
 
   return (
-    <div className="max-w-4xl mx-auto">
+    <div className="max-w-4xl mx-auto px-6 py-12">
+      <span className="inline-flex items-center gap-1 text-[var(--color-gray)] hover:text-[var(--color-vermilion)] mb-6 transition-colors">
+        <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+          <path
+            d="M10 12L6 8L10 4"
+            stroke="currentColor"
+            strokeWidth="1.5"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          />
+        </svg>
+        返回规划列表
+      </span>
+
       {/* 标题区域 */}
       <header className="mb-8">
         <div className="flex items-center gap-3 mb-2">
-          <h1 className="text-2xl font-bold text-[var(--color-text)]">{metadata.title}</h1>
+          <h1 className="text-2xl font-bold">{metadata.title}</h1>
           <span className={`text-xs px-2 py-1 rounded ${roadmapStatusCfg.className}`}>
             {roadmapStatusCfg.label}
           </span>
@@ -98,7 +128,7 @@ export function RoadmapPreview({ metadata, content }: RoadmapPreviewProps) {
           <div className="bg-[var(--color-paper-dark)] rounded-lg p-4">
             <div className="flex justify-between text-sm mb-2">
               <span className="text-[var(--color-gray)]">完成进度</span>
-              <span className="font-medium text-[var(--color-text)]">
+              <span className="font-medium">
                 {doneCount}/{total} ({progressPercent}%)
               </span>
             </div>
@@ -119,50 +149,60 @@ export function RoadmapPreview({ metadata, content }: RoadmapPreviewProps) {
         </article>
       )}
 
-      <div className="divider-cloud my-8" />
+      {items.length > 0 && remainingContent.trim() && <div className="divider-cloud my-8" />}
 
-      {/* 任务列表 - 进行中 */}
-      {inProgress.length > 0 && (
-        <section className="mb-10">
-          <h3 className="text-lg font-medium mb-4 flex items-center gap-2 text-[var(--color-text)]">
-            <span className="w-3 h-3 rounded-full bg-[var(--color-primary)]" />
-            正在进行 ({inProgress.length})
-          </h3>
-          <div className="grid gap-3">
-            {inProgress.map((item) => (
-              <RoadmapItemCard key={item.id} item={item} />
-            ))}
-          </div>
-        </section>
-      )}
-
-      {/* 任务列表 - 待开始 */}
-      {todo.length > 0 && (
-        <section className="mb-10">
-          <h3 className="text-lg font-medium mb-4 flex items-center gap-2 text-[var(--color-text)]">
-            <span className="w-3 h-3 rounded-full bg-gray-300" />
-            计划中 ({todo.length})
-          </h3>
-          <div className="grid gap-3">
-            {todo.map((item) => (
-              <RoadmapItemCard key={item.id} item={item} />
-            ))}
-          </div>
-        </section>
-      )}
-
-      {/* 任务列表 - 已完成 */}
-      {done.length > 0 && (
+      {/* 任务列表 */}
+      {items.length > 0 && (
         <section>
-          <h3 className="text-lg font-medium mb-4 flex items-center gap-2 text-[var(--color-text)]">
-            <span className="w-3 h-3 rounded-full bg-green-500" />
-            已完成 ({done.length})
-          </h3>
-          <div className="grid gap-3">
-            {done.map((item) => (
-              <RoadmapItemCard key={item.id} item={item} />
-            ))}
-          </div>
+          <h2 className="text-xl font-semibold mb-8 flex items-center gap-2 text-[var(--color-text)]">
+            <span className="w-3 h-3 rounded-full bg-[var(--color-vermilion)]" />
+            任务列表 ({items.length})
+          </h2>
+
+          {/* 任务列表 - 进行中 */}
+          {inProgress.length > 0 && (
+            <section className="mb-10">
+              <h3 className="text-lg font-medium mb-4 flex items-center gap-2 text-[var(--color-text)]">
+                <span className="w-3 h-3 rounded-full bg-[var(--color-vermilion)]" />
+                正在进行 ({inProgress.length})
+              </h3>
+              <div className="grid gap-3">
+                {inProgress.map((item) => (
+                  <RoadmapItemCard key={item.id} item={item} />
+                ))}
+              </div>
+            </section>
+          )}
+
+          {/* 任务列表 - 待开始 */}
+          {todo.length > 0 && (
+            <section className="mb-10">
+              <h3 className="text-lg font-medium mb-4 flex items-center gap-2 text-[var(--color-text)]">
+                <span className="w-3 h-3 rounded-full bg-gray-300" />
+                计划中 ({todo.length})
+              </h3>
+              <div className="grid gap-3">
+                {todo.map((item) => (
+                  <RoadmapItemCard key={item.id} item={item} />
+                ))}
+              </div>
+            </section>
+          )}
+
+          {/* 任务列表 - 已完成 */}
+          {done.length > 0 && (
+            <section>
+              <h3 className="text-lg font-medium mb-4 flex items-center gap-2 text-[var(--color-text)]">
+                <span className="w-3 h-3 rounded-full bg-green-500" />
+                已完成 ({done.length})
+              </h3>
+              <div className="grid gap-3">
+                {done.map((item) => (
+                  <RoadmapItemCard key={item.id} item={item} />
+                ))}
+              </div>
+            </section>
+          )}
         </section>
       )}
 
@@ -174,4 +214,3 @@ export function RoadmapPreview({ metadata, content }: RoadmapPreviewProps) {
     </div>
   );
 }
-
