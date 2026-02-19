@@ -1,18 +1,79 @@
 import { create } from 'zustand';
 import { invokeTauri } from '@/platform/tauri';
-import { parseMarkdownContent, serializeMarkdownContent, serializeDocContent } from '@/services/contentParser';
+import {
+  parseMarkdownContent,
+  serializeDocContentPreservingFrontmatter,
+  serializeMarkdownContentPreservingFrontmatter,
+} from '@/services/contentParser';
 import { buildDocFilePath, buildJasblogFilePath, createNewDocMarkdown, createNewJasblogMarkdown } from '@/services/contentTemplates';
-import type { ContentType, EditorFile, NoteMetadata, ProjectMetadata, RoadmapMetadata, GraphMetadata, DocMetadata, JasBlogContentType } from '@/types';
+import type { ContentType, EditorFile, NoteMetadata, ProjectMetadata, DiaryMetadata, RoadmapMetadata, GraphMetadata, DocMetadata, JasBlogContentType } from '@/types';
 
-type Metadata = NoteMetadata | ProjectMetadata | RoadmapMetadata | GraphMetadata | DocMetadata;
+type Metadata = NoteMetadata | ProjectMetadata | DiaryMetadata | RoadmapMetadata | GraphMetadata | DocMetadata;
 
 export type EditorViewMode = 'edit' | 'preview' | 'split';
+export type PreviewMode = 'detail' | 'list';
+
+function titleFromSlug(value: string): string {
+  return value.replace(/[-_]+/g, ' ').trim();
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null;
+}
+
+function deepEqual(a: unknown, b: unknown): boolean {
+  if (Object.is(a, b)) return true;
+
+  if (Array.isArray(a) && Array.isArray(b)) {
+    if (a.length !== b.length) return false;
+    for (let i = 0; i < a.length; i += 1) {
+      if (!deepEqual(a[i], b[i])) return false;
+    }
+    return true;
+  }
+
+  if (Array.isArray(a) || Array.isArray(b)) return false;
+
+  if (isRecord(a) && isRecord(b)) {
+    const aKeys = Object.keys(a);
+    const bKeys = Object.keys(b);
+    if (aKeys.length !== bKeys.length) return false;
+
+    for (const key of aKeys) {
+      if (!(key in b)) return false;
+      if (!deepEqual(a[key], b[key])) return false;
+    }
+
+    return true;
+  }
+
+  return false;
+}
+
+function inferDiaryFromFileName(fileNameNoExt: string): Pick<DiaryMetadata, 'date' | 'time' | 'title'> | null {
+  // 支持：YYYY-MM-DD-HH-mm-title.md、YYYY-MM-DD-HH-mm.md、YYYY-MM-DD.md（与 JasBlog src/lib/diary.ts 一致）
+  const fileNamePattern = /^(\d{4}-\d{2}-\d{2})(?:-(\d{2})-(\d{2}))?(?:-(.+))?$/;
+  const match = fileNameNoExt.match(fileNamePattern);
+  if (!match) return null;
+
+  const [, date, hour, minute, titleSlug] = match;
+  const time = hour && minute ? `${hour}:${minute}` : '';
+  const title = titleSlug ? titleFromSlug(titleSlug) : date;
+
+  return { date, time, title };
+}
 
 interface EditorState {
   currentFile: EditorFile | null;
   isLoading: boolean;
   error: string | null;
   viewMode: EditorViewMode;
+  previewMode: PreviewMode;
+
+  // 列表页预览的 UI 状态：用于在 detail/list 之间切换时保留筛选条件
+  notesListTag: string;
+  diaryTimelineYear: string;
+  diaryTimelineMonth: string;
 
   openFile: (path: string, type: ContentType) => Promise<void>;
   closeFile: () => void;
@@ -26,6 +87,10 @@ interface EditorState {
   deleteFile: (path: string) => Promise<void>;
   renameFile: (oldPath: string, newPath: string) => Promise<void>;
   setViewMode: (mode: EditorViewMode) => void;
+  setPreviewMode: (mode: PreviewMode) => void;
+  setNotesListTag: (tag: string) => void;
+  setDiaryTimelineYear: (year: string) => void;
+  setDiaryTimelineMonth: (month: string) => void;
   clearError: () => void;
 }
 
@@ -34,6 +99,11 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   isLoading: false,
   error: null,
   viewMode: 'edit',
+  previewMode: 'detail',
+
+  notesListTag: '',
+  diaryTimelineYear: 'all',
+  diaryTimelineMonth: 'all',
 
   openFile: async (path, type) => {
     set({ isLoading: true, error: null });
@@ -44,6 +114,22 @@ export const useEditorStore = create<EditorState>((set, get) => ({
 
       // 所有类型都使用 Markdown 解析
       const parsed = parseMarkdownContent(content, type);
+      let metadata = parsed.metadata as Metadata;
+
+      if (type === 'diary') {
+        const inferred = inferDiaryFromFileName(name.replace(/\.md$/i, ''));
+        const today = new Date().toISOString().split('T')[0];
+
+        const diary = metadata as DiaryMetadata;
+        metadata = {
+          ...diary,
+          title: diary.title || inferred?.title || name.replace(/\.md$/i, ''),
+          date: diary.date || inferred?.date || today,
+          time: diary.time || inferred?.time || '00:00',
+          tags: diary.tags || [],
+          companions: diary.companions || [],
+        };
+      }
 
       set({
         currentFile: {
@@ -51,9 +137,14 @@ export const useEditorStore = create<EditorState>((set, get) => ({
           name,
           type,
           content: parsed.content,
-          metadata: parsed.metadata,
+          metadata,
+          frontmatterRaw: parsed.hasFrontmatter ? parsed.frontmatterRaw : undefined,
+          frontmatterBlock: parsed.hasFrontmatter ? parsed.frontmatterBlock ?? undefined : undefined,
+          metadataDirty: false,
           isDirty: false,
           hasFrontmatter: parsed.hasFrontmatter,
+          hasBom: parsed.hasBom,
+          lineEnding: parsed.lineEnding,
         },
         isLoading: false,
       });
@@ -84,11 +175,17 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     const { currentFile } = get();
     if (!currentFile) return;
 
+    const nextMetadata = { ...currentFile.metadata, ...partialMetadata } as Metadata;
+    if (deepEqual(nextMetadata, currentFile.metadata)) {
+      return;
+    }
+
     set({
       currentFile: {
         ...currentFile,
-        metadata: { ...currentFile.metadata, ...partialMetadata } as Metadata,
+        metadata: nextMetadata,
         isDirty: true,
+        metadataDirty: true,
       },
     });
   },
@@ -106,13 +203,42 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         // 普通文档：根据 hasFrontmatter 决定是否保留 frontmatter
         const metadata = currentFile.metadata as DocMetadata;
         const shouldIncludeFrontmatter = currentFile.hasFrontmatter || !!metadata.title;
-        fileContent = serializeDocContent(metadata, currentFile.content, shouldIncludeFrontmatter);
+        if (currentFile.hasFrontmatter && currentFile.frontmatterBlock && !currentFile.metadataDirty) {
+          // 仅正文变更时，原样复用 frontmatter（保留注释/格式）
+          fileContent = `${currentFile.frontmatterBlock}${currentFile.content}`;
+        } else {
+          fileContent = serializeDocContentPreservingFrontmatter(metadata, currentFile.content, {
+            includeFrontmatter: shouldIncludeFrontmatter,
+            frontmatterBlock: currentFile.frontmatterBlock,
+          });
+        }
       } else {
-        // note, project, roadmap, graph 都使用统一的 Markdown 序列化
-        fileContent = serializeMarkdownContent(
-          currentFile.metadata as NoteMetadata | ProjectMetadata | RoadmapMetadata | GraphMetadata,
-          currentFile.content
-        );
+        if (currentFile.hasFrontmatter && currentFile.frontmatterBlock && !currentFile.metadataDirty) {
+          // 仅正文变更时，原样复用 frontmatter（保留注释/格式），避免保存产生无意义 diff
+          fileContent = `${currentFile.frontmatterBlock}${currentFile.content}`;
+        } else {
+          // JasBlog 内容类型统一使用 Markdown 序列化
+          fileContent = serializeMarkdownContentPreservingFrontmatter(
+            currentFile.metadata as NoteMetadata | ProjectMetadata | DiaryMetadata | RoadmapMetadata | GraphMetadata,
+            currentFile.content,
+            {
+              frontmatterBlock: currentFile.frontmatterBlock,
+              frontmatterRaw: currentFile.frontmatterRaw,
+            }
+          );
+        }
+      }
+
+      // 尽量保持字节一致：保持原文件的换行风格（JasBlog content 多为 CRLF）
+      const lineEnding = currentFile.lineEnding || 'lf';
+      fileContent = fileContent.replace(/\r\n/g, '\n');
+      if (lineEnding === 'crlf') {
+        fileContent = fileContent.replace(/\n/g, '\r\n');
+      }
+
+      // 尽量保持字节一致：如果原文件带 BOM，则写回时也带 BOM
+      if (currentFile.hasBom && fileContent.charCodeAt(0) !== 0xFEFF) {
+        fileContent = `\uFEFF${fileContent}`;
       }
 
       await invokeTauri('write_file', {
@@ -120,10 +246,19 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         content: fileContent,
       });
 
+      // 保存后刷新当前文件的 frontmatterBlock（后续正文改动继续“原样保存”）
+      const reparsed = parseMarkdownContent(fileContent, currentFile.type);
+      const nextFrontmatterBlock = reparsed.hasFrontmatter ? reparsed.frontmatterBlock ?? undefined : undefined;
+      const nextFrontmatterRaw = reparsed.hasFrontmatter ? reparsed.frontmatterRaw : undefined;
+
       set({
         currentFile: {
           ...currentFile,
           isDirty: false,
+          metadataDirty: false,
+          hasFrontmatter: reparsed.hasFrontmatter,
+          frontmatterBlock: nextFrontmatterBlock,
+          frontmatterRaw: nextFrontmatterRaw,
         },
         isLoading: false,
       });
@@ -138,7 +273,10 @@ export const useEditorStore = create<EditorState>((set, get) => ({
 
     try {
       const path = buildJasblogFilePath(workspacePath, type, filename);
-      const content = createNewJasblogMarkdown(type, filename);
+      // JasBlog content 目录在 Windows 环境中常见 CRLF + BOM；新建时尽量保持风格一致
+      let content = createNewJasblogMarkdown(type, filename);
+      content = content.replace(/\r\n/g, '\n').replace(/\n/g, '\r\n');
+      content = `\uFEFF${content}`;
       await invokeTauri('create_file', { path, content });
       set({ isLoading: false });
       return path;
@@ -246,6 +384,22 @@ export const useEditorStore = create<EditorState>((set, get) => ({
 
   setViewMode: (mode) => {
     set({ viewMode: mode });
+  },
+
+  setPreviewMode: (mode) => {
+    set({ previewMode: mode });
+  },
+
+  setNotesListTag: (tag) => {
+    set({ notesListTag: tag });
+  },
+
+  setDiaryTimelineYear: (year) => {
+    set({ diaryTimelineYear: year });
+  },
+
+  setDiaryTimelineMonth: (month) => {
+    set({ diaryTimelineMonth: month });
   },
 
   clearError: () => {

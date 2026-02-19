@@ -8,24 +8,27 @@ import type { JasBlogContentType } from '@/types';
 import { NewMenu } from './toolbar/NewMenu';
 import { ThemeMenu } from './toolbar/ThemeMenu';
 import { ViewModeToggle } from './toolbar/ViewModeToggle';
+import { PreviewModeToggle } from './toolbar/PreviewModeToggle';
 import { ErrorToast } from './toolbar/ErrorToast';
 import { HelpModal } from './toolbar/HelpModal';
+import { JasBlogSearchModal } from './toolbar/JasBlogSearchModal';
 
 export function Toolbar() {
   const {
     settings,
-    setWorkspacePath,
-    setWorkspaceType,
+    saveSettings,
     setTheme,
     error: settingsError,
     clearError: clearSettingsError,
   } = useSettingsStore();
-  const { workspaceType, refreshFileTree, initWorkspace } = useFileStore();
+  const { workspacePath, workspaceType, refreshFileTree, initWorkspace } = useFileStore();
   const {
     currentFile,
     saveFile,
     viewMode,
     setViewMode,
+    previewMode,
+    setPreviewMode,
     isLoading,
     error: editorError,
     clearError: clearEditorError,
@@ -38,6 +41,7 @@ export function Toolbar() {
   const { toggleMiniMode, error: windowError, clearError: clearWindowError } = useWindowStore();
   const [localError, setLocalError] = useState<string | null>(null);
   const [helpOpen, setHelpOpen] = useState(false);
+  const [searchOpen, setSearchOpen] = useState(false);
 
   const currentTheme = settings.theme || 'system';
   const effectiveTheme = getEffectiveTheme(currentTheme);
@@ -58,15 +62,51 @@ export function Toolbar() {
     }
   }, [displayError, clearEditorError, clearWindowError, clearSettingsError]);
 
+  const isEditableTarget = (target: EventTarget | null) => {
+    if (!target || !(target instanceof HTMLElement)) return false;
+    const tagName = target.tagName.toLowerCase();
+    return (
+      target.isContentEditable ||
+      tagName === 'input' ||
+      tagName === 'textarea' ||
+      tagName === 'select'
+    );
+  };
+
+  // 搜索快捷键：/ 打开，ESC 关闭（对齐 JasBlog Header 行为）
+  useEffect(() => {
+    if (workspaceType !== 'jasblog') return;
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === '/') {
+        if (isEditableTarget(event.target)) return;
+        event.preventDefault();
+        setSearchOpen(true);
+        return;
+      }
+
+      if (event.key === 'Escape') {
+        if (!searchOpen) return;
+        event.preventDefault();
+        setSearchOpen(false);
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [workspaceType, searchOpen]);
+
   const handleSelectWorkspace = async () => {
     try {
       const path = await openFolderDialog({
         title: '选择工作区目录',
       });
       if (path) {
-        const detectedType = await initWorkspace(path);
-        await setWorkspacePath(path);
-        await setWorkspaceType(detectedType);
+        const resolved = await initWorkspace(path);
+        await saveSettings({
+          workspacePath: resolved.workspacePath,
+          workspaceType: resolved.workspaceType,
+        });
       }
     } catch (error) {
       console.error('选择工作区失败:', error);
@@ -86,9 +126,9 @@ export function Toolbar() {
   };
 
   const handleCreateJasblogFile = async (type: JasBlogContentType, filename: string) => {
-    if (!settings.workspacePath) return;
+    if (!workspacePath) return;
     try {
-      const path = await createNewFile(settings.workspacePath, type, filename);
+      const path = await createNewFile(workspacePath, type, filename);
       await openFile(path, type);
       await refreshFileTree();
     } catch (error) {
@@ -97,9 +137,9 @@ export function Toolbar() {
   };
 
   const handleCreateDoc = async (relativePath: string) => {
-    if (!settings.workspacePath) return;
+    if (!workspacePath) return;
     try {
-      const path = await createDocFile(settings.workspacePath, relativePath);
+      const path = await createDocFile(workspacePath, relativePath);
       await openFile(path, 'doc');
       await refreshFileTree();
     } catch (error) {
@@ -108,9 +148,9 @@ export function Toolbar() {
   };
 
   const handleCreateFolder = async (relativePath: string) => {
-    if (!settings.workspacePath) return;
+    if (!workspacePath) return;
     try {
-      await createFolder(settings.workspacePath, relativePath);
+      await createFolder(workspacePath, relativePath);
       await refreshFileTree();
     } catch (error) {
       setLocalError(`创建文件夹失败: ${error}`);
@@ -160,13 +200,13 @@ export function Toolbar() {
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" />
           </svg>
           <span className="max-w-[200px] truncate">
-            {settings.workspacePath?.split(/[/\\]/).pop() || '选择工作区'}
+            {workspacePath?.split(/[/\\]/).pop() || '选择工作区'}
           </span>
         </button>
 
         {/* 新建按钮 + 对话框 */}
         <NewMenu
-          disabled={!settings.workspacePath}
+          disabled={!workspacePath}
           workspaceType={workspaceType}
           onCreateJasblogFile={handleCreateJasblogFile}
           onCreateDoc={handleCreateDoc}
@@ -202,11 +242,29 @@ export function Toolbar() {
 
         {/* 视图切换 */}
         {currentFile && (
-          <ViewModeToggle value={viewMode} onChange={setViewMode} />
+          <div className="flex items-center gap-2">
+            <ViewModeToggle value={viewMode} onChange={setViewMode} />
+            {workspaceType === 'jasblog' && currentFile.type !== 'doc' && (
+              <PreviewModeToggle value={previewMode} onChange={setPreviewMode} />
+            )}
+          </div>
         )}
 
         {/* 主题切换 */}
         <ThemeMenu currentTheme={currentTheme} effectiveTheme={effectiveTheme} onSetTheme={handleSetTheme} />
+
+        {/* JasBlog 全局搜索 */}
+        {workspaceType === 'jasblog' && (
+          <button
+            onClick={() => setSearchOpen((open) => !open)}
+            className="flex items-center gap-1 px-2 py-1.5 text-sm text-[var(--color-text-muted)] hover:text-[var(--color-text)] hover:bg-[var(--color-surface)] rounded-md transition-colors"
+            title="搜索（快捷键 /）"
+          >
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-4.35-4.35m0 0A7.5 7.5 0 103.9 3.9a7.5 7.5 0 0012.75 12.75z" />
+            </svg>
+          </button>
+        )}
 
         {/* 帮助 */}
         <button
@@ -247,6 +305,8 @@ export function Toolbar() {
       )}
 
       <HelpModal open={helpOpen} onClose={() => setHelpOpen(false)} />
+
+      <JasBlogSearchModal open={searchOpen} onClose={() => setSearchOpen(false)} />
     </>
   );
 }

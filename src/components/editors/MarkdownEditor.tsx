@@ -1,15 +1,18 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { useEditorStore } from '@/store';
 import { ContentPreview } from '../preview';
+import { PreviewScrollProvider } from '@/components/preview/PreviewScrollContext';
+import { JasBlogListPreview } from '@/components/preview/JasBlogListPreview';
 
 // 防抖延迟时间（毫秒）
 const DEBOUNCE_DELAY = 300;
 
 export function MarkdownEditor() {
-  const { currentFile, updateContent, viewMode } = useEditorStore();
+  const { currentFile, updateContent, viewMode, previewMode } = useEditorStore();
 
   // 本地内容状态，用于即时响应输入
   const [localContent, setLocalContent] = useState('');
+  const [previewContainer, setPreviewContainer] = useState<HTMLDivElement | null>(null);
 
   // 防抖定时器
   const debounceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -60,11 +63,20 @@ export function MarkdownEditor() {
     />
   );
 
-  const renderPreview = () => (
-    <div className="w-full h-full overflow-auto bg-[var(--color-paper)]">
-      <ContentPreview file={currentFile} bodyContent={bodyContent} />
-    </div>
-  );
+  const renderPreview = () => {
+    const showListPreview = previewMode === 'list' && currentFile.type !== 'doc';
+
+    return (
+      <div ref={setPreviewContainer} className="w-full h-full overflow-auto bg-[var(--color-paper)]">
+        <PreviewScrollProvider container={previewContainer}>
+          {showListPreview
+            ? <JasBlogListPreview activeFile={currentFile} activeBodyContent={bodyContent} />
+            : <ContentPreview file={currentFile} bodyContent={bodyContent} />
+          }
+        </PreviewScrollProvider>
+      </div>
+    );
+  };
 
   if (viewMode === 'edit') {
     return <div className="flex-1 min-h-0 overflow-hidden">{renderEditor()}</div>;

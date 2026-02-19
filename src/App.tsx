@@ -1,10 +1,10 @@
-import { useEffect } from "react";
+import { useCallback, useEffect } from "react";
 import { Toolbar, Sidebar, EditorArea, MetadataPanel, MiniModeLayout } from "@/components";
 import { useSettingsStore, useFileStore, useEditorStore, useWindowStore } from "@/store";
 import { useGlobalShortcutsEffect, useSaveShortcutEffect, useThemeEffect, useWorkspaceInitEffect } from "@/hooks";
 
 function App() {
-  const { loadSettings, settings } = useSettingsStore();
+  const { loadSettings, saveSettings, settings } = useSettingsStore();
   const { initWorkspace } = useFileStore();
   const saveFile = useEditorStore((state) => state.saveFile);
   const currentFile = useEditorStore((state) => state.currentFile);
@@ -16,10 +16,25 @@ function App() {
   }, [loadSettings]);
 
   useThemeEffect(settings.theme);
+
+  // 初始化工作区时，若自动解析出更“正确”的根目录/类型，则同步写回 settings（修复历史配置造成的判定偏差）
+  const handleWorkspaceResolved = useCallback(async (resolved: { workspacePath: string; workspaceType: 'jasblog' | 'docs' }) => {
+    const current = useSettingsStore.getState().settings;
+    if (
+      current.workspacePath !== resolved.workspacePath ||
+      current.workspaceType !== resolved.workspaceType
+    ) {
+      await saveSettings({
+        workspacePath: resolved.workspacePath,
+        workspaceType: resolved.workspaceType,
+      });
+    }
+  }, [saveSettings]);
+
   useWorkspaceInitEffect({
     workspacePath: settings.workspacePath,
-    workspaceType: settings.workspaceType,
     initWorkspace,
+    onResolved: handleWorkspaceResolved,
   });
   useGlobalShortcutsEffect();
   useSaveShortcutEffect({ enabled: !!currentFile?.isDirty, onSave: saveFile });

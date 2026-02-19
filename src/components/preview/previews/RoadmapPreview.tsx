@@ -1,10 +1,12 @@
 import type { RoadmapMetadata, RoadmapItem } from '@/types';
 import { parseRoadmapItemsFromContent } from '@/services/contentParser';
+import { useEditorStore } from '@/store';
 import { MarkdownRenderer } from '../MarkdownRenderer';
 
 interface RoadmapPreviewProps {
   metadata: RoadmapMetadata;
   content: string;
+  embedded?: boolean;
 }
 
 // 任务状态配置
@@ -83,7 +85,8 @@ function RoadmapItemCard({ item }: { item: RoadmapItem }) {
 }
 
 // 规划预览（与 JasBlog roadmap/[slug]/page.tsx 一致）
-export function RoadmapPreview({ metadata, content }: RoadmapPreviewProps) {
+export function RoadmapPreview({ metadata, content, embedded = false }: RoadmapPreviewProps) {
+  const setPreviewMode = useEditorStore((state) => state.setPreviewMode);
   // 从正文内容解析任务列表和剩余内容
   const { items, remainingContent } = parseRoadmapItemsFromContent(content);
 
@@ -100,18 +103,24 @@ export function RoadmapPreview({ metadata, content }: RoadmapPreviewProps) {
 
   return (
     <div className="max-w-4xl mx-auto px-6 py-12">
-      <span className="inline-flex items-center gap-1 text-[var(--color-gray)] hover:text-[var(--color-vermilion)] mb-6 transition-colors">
-        <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
-          <path
-            d="M10 12L6 8L10 4"
-            stroke="currentColor"
-            strokeWidth="1.5"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          />
-        </svg>
-        返回规划列表
-      </span>
+      {!embedded && (
+        <button
+          type="button"
+          onClick={() => setPreviewMode('list')}
+          className="inline-flex items-center gap-1 text-[var(--color-gray)] hover:text-[var(--color-vermilion)] mb-6 transition-colors"
+        >
+          <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+            <path
+              d="M10 12L6 8L10 4"
+              stroke="currentColor"
+              strokeWidth="1.5"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            />
+          </svg>
+          返回规划列表
+        </button>
+      )}
 
       {/* 标题区域 */}
       <header className="mb-8">
@@ -143,7 +152,7 @@ export function RoadmapPreview({ metadata, content }: RoadmapPreviewProps) {
       </header>
 
       {/* 正文内容（非任务部分） */}
-      {remainingContent && (
+      {remainingContent.trim() && (
         <article className="prose-chinese mb-8">
           <MarkdownRenderer content={remainingContent} />
         </article>

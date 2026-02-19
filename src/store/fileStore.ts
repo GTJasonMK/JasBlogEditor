@@ -15,12 +15,13 @@ interface FileState {
   workspacePath: string | null;
   workspaceType: WorkspaceType | null;
   fileTree: FileTreeNode[];
+  fileTreeVersion: number;
   isLoading: boolean;
   error: string | null;
 
   setWorkspacePath: (path: string) => void;
   setWorkspaceType: (type: WorkspaceType) => void;
-  initWorkspace: (path: string, preferredType?: WorkspaceType | null) => Promise<WorkspaceType>;
+  initWorkspace: (path: string) => Promise<{ workspacePath: string; workspaceType: WorkspaceType }>;
   detectWorkspaceType: () => Promise<WorkspaceType>;
   loadFileTree: () => Promise<void>;
   refreshFileTree: () => Promise<void>;
@@ -36,6 +37,75 @@ const JASBLOG_DIR_ORDER = JASBLOG_CONTENT_TYPES.map((type) => CONTENT_DIRS[type]
 
 // 最大递归深度
 const MAX_DEPTH = 10;
+
+function trimTrailingSeparators(value: string): string {
+  return value.replace(/[\\/]+$/, '');
+}
+
+function getParentPath(value: string): string {
+  const trimmed = trimTrailingSeparators(value);
+  if (!trimmed) return value;
+
+  const slashIndex = Math.max(trimmed.lastIndexOf('/'), trimmed.lastIndexOf('\\'));
+  if (slashIndex === -1) return trimmed;
+
+  const parent = trimmed.slice(0, slashIndex);
+  if (!parent) {
+    return trimmed[0] === '/' ? '/' : trimmed;
+  }
+
+  return parent;
+}
+
+async function isJasBlogWorkspaceRoot(path: string): Promise<boolean> {
+  const workspacePath = trimTrailingSeparators(path);
+  if (!workspacePath) return false;
+
+  const contentPath = `${workspacePath}/content`;
+  const hasContent = await invokeTauri('path_exists', { path: contentPath });
+  if (!hasContent) return false;
+
+  const moduleDirs = Object.values(CONTENT_DIRS).map((dir) => `${contentPath}/${dir}`);
+  const exists = await Promise.all(
+    moduleDirs.map(async (dirPath) => {
+      try {
+        return await invokeTauri('path_exists', { path: dirPath });
+      } catch {
+        return false;
+      }
+    })
+  );
+
+  // 只要存在任意一个模块目录，就认为是 JasBlog 工作区
+  return exists.some(Boolean);
+}
+
+async function resolveWorkspacePath(inputPath: string): Promise<string> {
+  const normalized = trimTrailingSeparators(inputPath);
+  if (!normalized) return inputPath;
+
+  let current = normalized;
+  // 向上最多尝试 6 层，覆盖常见的选择：root / content / content/<module> / content/<module>/YYYY/MM...
+  for (let i = 0; i < 6; i += 1) {
+    if (await isJasBlogWorkspaceRoot(current)) {
+      return current;
+    }
+
+    const parent = getParentPath(current);
+    if (parent === current) break;
+    current = parent;
+  }
+
+  return normalized;
+}
+
+async function detectWorkspaceTypeByPath(path: string): Promise<WorkspaceType> {
+  try {
+    return await isJasBlogWorkspaceRoot(path) ? 'jasblog' : 'docs';
+  } catch {
+    return 'docs';
+  }
+}
 
 /**
  * 递归加载文件树（普通文档模式）
@@ -85,6 +155,59 @@ async function loadDocsFileTree(dirPath: string, depth = 0): Promise<FileTreeNod
 }
 
 /**
+ * 递归加载 JasBlog 内容文件树（content/<type>/...）
+ * - 仅收集 .md 文件
+ * - 允许内容目录下存在子目录（Diary 默认就是 YYYY/MM 结构）
+ */
+async function loadJasBlogContentTree(
+  dirPath: string,
+  contentType: JasBlogContentType,
+  depth = 0
+): Promise<FileTreeNode[]> {
+  if (depth > MAX_DEPTH) return [];
+
+  const files = await invokeTauri('read_directory', { path: dirPath });
+  const nodes: FileTreeNode[] = [];
+
+  for (const file of files) {
+    // 跳过隐藏文件/目录
+    if (file.name.startsWith('.')) continue;
+
+    if (file.is_dir) {
+      const children = await loadJasBlogContentTree(file.path, contentType, depth + 1);
+      if (children.length > 0) {
+        nodes.push({
+          name: file.name,
+          path: file.path,
+          isDir: true,
+          children,
+        });
+      }
+      continue;
+    }
+
+    if (!file.name.toLowerCase().endsWith('.md')) continue;
+
+    nodes.push({
+      name: file.name,
+      path: file.path,
+      isDir: false,
+      contentType,
+    });
+  }
+
+  // 排序：目录在前，文件在后，各自按名称排序
+  nodes.sort((a, b) => {
+    if (a.isDir !== b.isDir) {
+      return a.isDir ? -1 : 1;
+    }
+    return a.name.localeCompare(b.name);
+  });
+
+  return nodes;
+}
+
+/**
  * 加载 JasBlog 文件树
  */
 async function loadJasBlogFileTree(workspacePath: string): Promise<FileTreeNode[]> {
@@ -95,16 +218,7 @@ async function loadJasBlogFileTree(workspacePath: string): Promise<FileTreeNode[
   for (const dir of contentDirs) {
     if (dir.is_dir && JASBLOG_DIR_TO_TYPE[dir.name]) {
       const contentType = JASBLOG_DIR_TO_TYPE[dir.name];
-      const files = await invokeTauri('read_directory', { path: dir.path });
-
-      const children: FileTreeNode[] = files
-        .filter(f => !f.is_dir && !f.name.startsWith('.'))
-        .map(f => ({
-          name: f.name,
-          path: f.path,
-          isDir: false,
-          contentType,
-        }));
+      const children = await loadJasBlogContentTree(dir.path, contentType);
 
       tree.push({
         name: dir.name,
@@ -122,84 +236,108 @@ async function loadJasBlogFileTree(workspacePath: string): Promise<FileTreeNode[
   return tree;
 }
 
-export const useFileStore = create<FileState>((set, get) => ({
-  workspacePath: null,
-  workspaceType: null,
-  fileTree: [],
-  isLoading: false,
-  error: null,
+export const useFileStore = create<FileState>((set, get) => {
+  let loadRequestId = 0;
+  let initRequestId = 0;
 
-  setWorkspacePath: (path) => {
-    set({ workspacePath: path, fileTree: [], error: null });
-  },
+  return {
+    workspacePath: null,
+    workspaceType: null,
+    fileTree: [],
+    fileTreeVersion: 0,
+    isLoading: false,
+    error: null,
 
-  setWorkspaceType: (type) => {
-    set({ workspaceType: type });
-  },
+    setWorkspacePath: (path) => {
+      set({ workspacePath: path, fileTree: [], fileTreeVersion: 0, error: null });
+    },
 
-  initWorkspace: async (path, preferredType = null) => {
-    // 先写入路径，确保 detectWorkspaceType 使用的是最新值
-    set({ workspacePath: path, fileTree: [], error: null });
+    setWorkspaceType: (type) => {
+      set({ workspaceType: type });
+    },
 
-    // 优先使用外部传入的类型，否则自动检测
-    const workspaceType = preferredType || await get().detectWorkspaceType();
-    set({ workspaceType });
+    initWorkspace: async (path) => {
+      const requestId = ++initRequestId;
 
-    // 加载文件树
-    await get().loadFileTree();
-    return workspaceType;
-  },
+      const resolvedPath = await resolveWorkspacePath(path);
+      const detectedType = await detectWorkspaceTypeByPath(resolvedPath);
 
-  detectWorkspaceType: async () => {
-    const { workspacePath } = get();
-    if (!workspacePath) return 'docs';
+      const workspaceType = detectedType;
 
-    try {
-      // 检查是否有 content/notes 目录（JasBlog 项目标志）
-      const contentPath = `${workspacePath}/content`;
-      const notesPath = `${contentPath}/${CONTENT_DIRS.note}`;
+      if (requestId !== initRequestId) {
+        return { workspacePath: resolvedPath, workspaceType };
+      }
 
-      const hasContent = await invokeTauri('path_exists', { path: contentPath });
-      if (!hasContent) return 'docs';
+      const current = get();
+      if (
+        current.workspacePath === resolvedPath &&
+        current.workspaceType === workspaceType &&
+        current.fileTreeVersion > 0 &&
+        !current.isLoading
+      ) {
+        return { workspacePath: resolvedPath, workspaceType };
+      }
 
-      const hasNotes = await invokeTauri('path_exists', { path: notesPath });
-      return hasNotes ? 'jasblog' : 'docs';
-    } catch {
-      return 'docs';
-    }
-  },
+      // 先写入路径，确保后续 loadFileTree 使用的是最新值
+      set({ workspacePath: resolvedPath, workspaceType, fileTree: [], fileTreeVersion: 0, error: null });
 
-  loadFileTree: async () => {
-    const { workspacePath, workspaceType } = get();
-    if (!workspacePath) return;
+      // 加载文件树
+      await get().loadFileTree();
+      return { workspacePath: resolvedPath, workspaceType };
+    },
 
-    set({ isLoading: true, error: null });
+    detectWorkspaceType: async () => {
+      const { workspacePath } = get();
+      if (!workspacePath) return 'docs';
 
-    try {
-      if (workspaceType === 'jasblog') {
-        // JasBlog 模式：检查 content 目录
-        const contentPath = `${workspacePath}/content`;
-        const contentExists = await invokeTauri('path_exists', { path: contentPath });
+      return await detectWorkspaceTypeByPath(workspacePath);
+    },
 
-        if (!contentExists) {
-          set({ error: '未找到 content 目录，请确认选择的是 JasBlog 项目目录', isLoading: false });
+    loadFileTree: async () => {
+      const { workspacePath, workspaceType } = get();
+      if (!workspacePath) return;
+
+      const requestId = ++loadRequestId;
+      const startWorkspacePath = workspacePath;
+      const startWorkspaceType = workspaceType;
+
+      set({ isLoading: true, error: null });
+
+      try {
+        if (workspaceType === 'jasblog') {
+          // JasBlog 模式：检查 content 目录
+          const contentPath = `${workspacePath}/content`;
+          const contentExists = await invokeTauri('path_exists', { path: contentPath });
+
+          if (!contentExists) {
+            if (requestId === loadRequestId) {
+              set({ error: '未找到 content 目录，请确认选择的是 JasBlog 项目目录', isLoading: false });
+            }
+            return;
+          }
+
+          const tree = await loadJasBlogFileTree(workspacePath);
+          if (requestId !== loadRequestId) return;
+          if (get().workspacePath !== startWorkspacePath || get().workspaceType !== startWorkspaceType) return;
+          set((state) => ({ fileTree: tree, fileTreeVersion: state.fileTreeVersion + 1, isLoading: false }));
           return;
         }
 
-        const tree = await loadJasBlogFileTree(workspacePath);
-        set({ fileTree: tree, isLoading: false });
-      } else {
         // 普通文档模式：递归加载
         const tree = await loadDocsFileTree(workspacePath);
-        set({ fileTree: tree, isLoading: false });
+        if (requestId !== loadRequestId) return;
+        if (get().workspacePath !== startWorkspacePath || get().workspaceType !== startWorkspaceType) return;
+        set((state) => ({ fileTree: tree, fileTreeVersion: state.fileTreeVersion + 1, isLoading: false }));
+      } catch (error) {
+        console.error('加载文件树失败:', error);
+        if (requestId !== loadRequestId) return;
+        if (get().workspacePath !== startWorkspacePath || get().workspaceType !== startWorkspaceType) return;
+        set({ error: `加载文件树失败: ${error}`, isLoading: false });
       }
-    } catch (error) {
-      console.error('加载文件树失败:', error);
-      set({ error: `加载文件树失败: ${error}`, isLoading: false });
-    }
-  },
+    },
 
-  refreshFileTree: async () => {
-    await get().loadFileTree();
-  },
-}));
+    refreshFileTree: async () => {
+      await get().loadFileTree();
+    },
+  };
+});

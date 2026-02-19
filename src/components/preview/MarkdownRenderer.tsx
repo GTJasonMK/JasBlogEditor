@@ -8,6 +8,15 @@ import "katex/dist/katex.min.css";
 import { MermaidDiagram } from "./MermaidDiagram";
 import { extractText, generateId } from "@/utils";
 
+// 与 JasBlog 的 preprocess-alerts.ts 行为对齐：将 blockquote 的 [!NOTE] 等语法替换为内部标记
+// 这样 parseAlertFromChildren 才能稳定识别，并在任何 Markdown 预览场景生效（帮助页/DocPreview 等）。
+function preprocessAlerts(content: string): string {
+  return content.replace(
+    /^(>\s*)\[!(NOTE|TIP|IMPORTANT|WARNING|CAUTION)\]\r?\n?/gm,
+    "$1ALERTBOX$2ALERTBOX\n",
+  );
+}
+
 // 代码块复制按钮组件
 function CopyButton({ code }: { code: string }) {
   const [copied, setCopied] = useState(false);
@@ -219,6 +228,7 @@ interface MarkdownRendererProps {
 }
 
 export function MarkdownRenderer({ content }: MarkdownRendererProps) {
+  const processed = preprocessAlerts(content);
   return (
     <Markdown
       remarkPlugins={[remarkGfm, remarkMath]}
@@ -299,7 +309,7 @@ export function MarkdownRenderer({ content }: MarkdownRendererProps) {
         ),
       }}
     >
-      {content}
+      {processed}
     </Markdown>
   );
 }

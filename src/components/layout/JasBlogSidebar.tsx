@@ -7,6 +7,7 @@ import { confirmDialog } from '@/utils/confirmDialog';
 import { renameSiblingPath } from '@/utils';
 import { FileContextMenu } from './sidebar/FileContextMenu';
 import { RenameDialog } from './sidebar/RenameDialog';
+import { DocsTreeItem } from './DocsTreeItem';
 
 interface ContextMenuState {
   visible: boolean;
@@ -15,9 +16,17 @@ interface ContextMenuState {
   file: FileTreeNode | null;
 }
 
+function countLeafFiles(nodes?: FileTreeNode[]): number {
+  if (!nodes) return 0;
+  return nodes.reduce((sum, node) => {
+    if (node.isDir) return sum + countLeafFiles(node.children);
+    return sum + 1;
+  }, 0);
+}
+
 export function JasBlogSidebar() {
   const { fileTree, refreshFileTree } = useFileStore();
-  const { currentFile, openFile, deleteFile, renameFile } = useEditorStore();
+  const { currentFile, deleteFile, renameFile } = useEditorStore();
   const [expandedFolders, setExpandedFolders] = useState<Set<string>>(
     () => new Set(JASBLOG_CONTENT_TYPES.map((type) => CONTENT_DIRS[type]))
   );
@@ -34,11 +43,6 @@ export function JasBlogSidebar() {
       }
       return next;
     });
-  };
-
-  const handleFileClick = (node: FileTreeNode) => {
-    if (node.isDir || !node.contentType) return;
-    openFile(node.path, node.contentType);
   };
 
   const handleContextMenu = (e: React.MouseEvent, file: FileTreeNode) => {
@@ -126,7 +130,7 @@ export function JasBlogSidebar() {
                 </svg>
                 <span>{label}</span>
                 <span className="ml-auto text-xs text-[var(--color-text-subtle)]">
-                  {folder.children?.length || 0}
+                  {countLeafFiles(folder.children)}
                 </span>
               </button>
 
@@ -138,22 +142,14 @@ export function JasBlogSidebar() {
                     暂无内容
                   </div>
                 ) : (
-                  folder.children.map((file) => (
-                    <button
-                      key={file.path}
-                      onClick={() => handleFileClick(file)}
-                      onContextMenu={(e) => handleContextMenu(e, file)}
-                      className={`w-full flex items-center gap-2 px-2 py-1.5 text-sm rounded transition-colors ${
-                        currentFile?.path === file.path
-                          ? 'bg-[var(--color-primary)] text-white'
-                          : 'text-[var(--color-text-muted)] hover:bg-[var(--color-surface-hover)] hover:text-[var(--color-text)]'
-                      }`}
-                    >
-                      <svg className="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
-                      </svg>
-                      <span className="truncate">{file.name}</span>
-                    </button>
+                  folder.children.map((node) => (
+                    <DocsTreeItem
+                      key={node.path}
+                      node={node}
+                      currentPath={currentFile?.path}
+                      depth={0}
+                      onContextMenu={handleContextMenu}
+                    />
                   ))
                 )}
               </div>

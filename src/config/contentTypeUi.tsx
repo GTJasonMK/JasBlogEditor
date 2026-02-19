@@ -2,6 +2,7 @@ import type { ComponentType, ReactElement } from 'react';
 import type {
   ContentType,
   DocMetadata,
+  DiaryMetadata,
   EditorFile,
   GraphMetadata,
   NoteMetadata,
@@ -9,12 +10,14 @@ import type {
   RoadmapMetadata,
 } from '@/types';
 
+import { DiaryMetaForm } from '@/components/forms/DiaryMetaForm';
 import { DocMetaForm } from '@/components/forms/DocMetaForm';
 import { GraphMetaForm } from '@/components/forms/GraphMetaForm';
 import { NoteMetaForm } from '@/components/forms/NoteMetaForm';
 import { ProjectMetaForm } from '@/components/forms/ProjectMetaForm';
 import { RoadmapMetaForm } from '@/components/forms/RoadmapMetaForm';
 
+import { DiaryPreview } from '@/components/preview/previews/DiaryPreview';
 import { DocPreview } from '@/components/preview/previews/DocPreview';
 import { GraphPreview } from '@/components/preview/previews/GraphPreview';
 import { NotePreview } from '@/components/preview/previews/NotePreview';
@@ -39,13 +42,28 @@ export const CONTENT_TYPE_UI: Record<ContentType, ContentTypeUiConfig> = {
   note: {
     MetaForm: NoteMetaForm,
     renderPreview: (file, bodyContent) => (
-      <NotePreview metadata={file.metadata as NoteMetadata} content={bodyContent} />
+      <NotePreview
+        fileName={file.name}
+        metadata={file.metadata as NoteMetadata}
+        content={bodyContent}
+      />
     ),
   },
   project: {
     MetaForm: ProjectMetaForm,
     renderPreview: (file, bodyContent) => (
       <ProjectPreview metadata={file.metadata as ProjectMetadata} content={bodyContent} />
+    ),
+  },
+  diary: {
+    MetaForm: DiaryMetaForm,
+    renderPreview: (file, bodyContent) => (
+      <DiaryPreview
+        filePath={file.path}
+        fileName={file.name}
+        metadata={file.metadata as DiaryMetadata}
+        content={bodyContent}
+      />
     ),
   },
   roadmap: {

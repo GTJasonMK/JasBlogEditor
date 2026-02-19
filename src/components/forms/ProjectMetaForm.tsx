@@ -21,14 +21,17 @@ export function ProjectMetaForm() {
   const metadata = currentFile.metadata as ProjectMetadata;
 
   // 验证
-  const isTitleEmpty = !metadata.title.trim();
+  const isNameEmpty = !metadata.name.trim();
   const isGithubInvalid = metadata.github && !isValidUrl(metadata.github);
   const isDemoInvalid = metadata.demo && !isValidUrl(metadata.demo);
 
   // 技术栈：TechStackItem[] <-> string[] 转换
-  const techStackNames = (metadata.techStack || []).map(item => item.name);
+  const techStackItems = metadata.techStack || [];
+  const techStackNames = techStackItems.map(item => item.name);
   const handleTechStackChange = (names: string[]) => {
-    updateMetadata({ techStack: names.map(name => ({ name })) });
+    // 尽量保留已有的 icon/color 配置（与 JasBlog techStack 结构兼容）
+    const next = names.map((name) => techStackItems.find((item) => item.name === name) ?? { name });
+    updateMetadata({ techStack: next });
   };
 
   return (
@@ -40,14 +43,14 @@ export function ProjectMetaForm() {
         </label>
         <input
           type="text"
-          value={metadata.title}
-          onChange={(e) => updateMetadata({ title: e.target.value })}
+          value={metadata.name}
+          onChange={(e) => updateMetadata({ name: e.target.value })}
           className={`w-full px-3 py-2 text-sm border rounded-md focus:outline-none focus:border-[var(--color-primary)] ${
-            isTitleEmpty ? 'border-[var(--color-danger)]' : 'border-[var(--color-border)]'
+            isNameEmpty ? 'border-[var(--color-danger)]' : 'border-[var(--color-border)]'
           }`}
           required
         />
-        {isTitleEmpty && (
+        {isNameEmpty && (
           <span className="text-xs text-[var(--color-danger)] mt-1">项目名称不能为空</span>
         )}
       </div>

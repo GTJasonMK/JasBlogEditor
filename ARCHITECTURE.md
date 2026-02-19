@@ -62,7 +62,7 @@ App 组件挂载
   |           |
   |           +--> Tauri: path_exists  检查 content/ 目录
   |           +--> Tauri: read_directory  读取 content/ 下的子目录
-  |           +--> Tauri: read_directory  逐个读取 notes/projects/roadmaps/graphs/ 下的文件
+  |           +--> Tauri: read_directory  逐个读取 notes/projects/diary/roadmaps/graphs/ 下的文件（diary 支持递归子目录）
   |           |
   |           +--> 构建 fileTree 数据结构
   |
@@ -351,7 +351,7 @@ isDir               <-->   is_dir
 
 ## 八、视图模式切换
 
-仅对 Markdown 类型（note, project, roadmap）生效，graph 类型固定使用 JsonEditor：
+对所有内容类型生效，统一由 `MarkdownEditor` 渲染与切换（graph 也是 Markdown 文件，图谱数据位于 ` ```graph ` 代码块）：
 
 ```
 Toolbar 视图切换按钮
@@ -361,7 +361,7 @@ Toolbar 视图切换按钮
   MarkdownEditor 根据 viewMode 渲染
   |
   +--> 'edit'     仅显示 textarea 编辑区
-  +--> 'preview'  仅显示 prose-chinese 预览区（renderMarkdownToHtml）
+  +--> 'preview'  仅显示预览区（还原 JasBlog 页面渲染效果）
   +--> 'split'    左右分屏，左编辑右预览
 ```
 
@@ -374,8 +374,9 @@ Toolbar 视图切换按钮
   content/
     notes/        --> ContentType: 'note'      (.md 文件)
     projects/     --> ContentType: 'project'   (.md 文件)
+    diary/        --> ContentType: 'diary'     (.md 文件，可按 YYYY/MM 分目录)
     roadmaps/     --> ContentType: 'roadmap'   (.md 文件)
-    graphs/       --> ContentType: 'graph'     (.json 文件)
+    graphs/       --> ContentType: 'graph'     (.md 文件，包含 ```graph 代码块)
 ```
 
-目录名到 ContentType 的映射定义在 `fileStore.ts` 的 `CONTENT_DIR_MAP` 和 `types/content.ts` 的 `CONTENT_DIRS` 中。
+目录名到 ContentType 的映射定义在 `src/types/content.ts` 的 `CONTENT_DIRS` 中，加载逻辑在 `src/store/fileStore.ts`。

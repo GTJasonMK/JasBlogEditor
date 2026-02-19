@@ -9,16 +9,18 @@ export type WorkspaceType = 'jasblog' | 'docs';
 export type ThemeMode = 'light' | 'dark' | 'system';
 
 // 内容类型枚举
-export type ContentType = 'note' | 'project' | 'roadmap' | 'graph' | 'doc';
+export type ContentType = 'note' | 'project' | 'diary' | 'roadmap' | 'graph' | 'doc';
 
-// JasBlog 内容类型（content/ 下的固定四类）
-export const JASBLOG_CONTENT_TYPES = ['note', 'project', 'roadmap', 'graph'] as const;
+// JasBlog 内容类型（content/ 下的固定内容模块）
+// 顺序与 JasBlog 顶部导航保持一致：Projects / Notes / Diary / Graphs / Roadmap
+export const JASBLOG_CONTENT_TYPES = ['project', 'note', 'diary', 'graph', 'roadmap'] as const;
 export type JasBlogContentType = (typeof JASBLOG_CONTENT_TYPES)[number];
 
 // 内容类型中文标签（用于 UI 显示）
 export const CONTENT_TYPE_LABELS: Record<ContentType, string> = {
   note: '笔记',
   project: '项目',
+  diary: '日记',
   roadmap: '规划',
   graph: '图谱',
   doc: '文档',
@@ -26,16 +28,18 @@ export const CONTENT_TYPE_LABELS: Record<ContentType, string> = {
 
 // JasBlog 左侧栏分组名称（比内容类型标签更贴近站点语义）
 export const JASBLOG_SECTION_LABELS: Record<JasBlogContentType, string> = {
-  note: '学习笔记',
   project: '开源项目',
-  roadmap: '我的规划',
+  note: '学习笔记',
+  diary: '日记',
   graph: '知识图谱',
+  roadmap: '我的规划',
 };
 
 // JasBlog 左侧栏分组图标（Heroicons path）
 export const JASBLOG_SECTION_ICONS: Record<JasBlogContentType, string> = {
   note: 'M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z',
   project: 'M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z',
+  diary: 'M12 6.253v13m0-13C10.832 5.253 9.246 4.5 7.5 4.5S4.168 5.253 3 6.253v13C4.168 18.253 5.754 17.5 7.5 17.5s3.332.753 4.5 1.753m0-13C13.168 5.253 14.754 4.5 16.5 4.5s3.332.753 4.5 1.753v13C19.832 18.253 18.246 17.5 16.5 17.5s-3.332.753-4.5 1.753',
   roadmap: 'M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01',
   graph: 'M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1',
 };
@@ -52,9 +56,20 @@ export interface NoteMetadata extends BaseMetadata {
   tags?: string[];
 }
 
+// 日记元数据（与 JasBlog content/diary 兼容）
+export interface DiaryMetadata extends BaseMetadata {
+  time: string;
+  excerpt: string;
+  tags?: string[];
+  mood?: string;
+  weather?: string;
+  location?: string;
+  companions: string[];
+}
+
 // 开源项目元数据
 export interface ProjectMetadata {
-  title: string;
+  name: string;
   description: string;
   github: string;
   demo?: string;
@@ -67,6 +82,7 @@ export interface ProjectMetadata {
 export interface TechStackItem {
   name: string;
   icon?: string;
+  color?: string;
 }
 
 // 规划文档元数据（frontmatter 部分）
@@ -223,15 +239,23 @@ export interface FileInfo {
   isDir: boolean;
 }
 
+// 文件行尾风格（用于尽量保持保存后的字节/差异最小）
+export type LineEnding = 'lf' | 'crlf';
+
 // 编辑器文件
 export interface EditorFile {
   path: string;
   name: string;
   type: ContentType;
   content: string;
-  metadata: NoteMetadata | ProjectMetadata | RoadmapMetadata | GraphMetadata | DocMetadata;
+  metadata: NoteMetadata | ProjectMetadata | DiaryMetadata | RoadmapMetadata | GraphMetadata | DocMetadata;
+  frontmatterRaw?: Record<string, unknown>; // 用于保存时尽量保留未知 frontmatter 字段/顺序
+  frontmatterBlock?: string; // 原始 frontmatter 块（含 --- 边界），用于“原样保存”（保留注释/格式）
+  metadataDirty: boolean; // 是否修改过元数据（仅正文改动时可复用原始 frontmatter）
   isDirty: boolean;
   hasFrontmatter: boolean;  // 标记原文件是否有 frontmatter
+  hasBom: boolean; // 标记原文件是否带 UTF-8 BOM（用于尽量保持字节一致）
+  lineEnding: LineEnding; // 标记原文件的换行风格（LF/CRLF）
 }
 
 // 设置
@@ -264,6 +288,7 @@ export interface WindowState {
 export const CONTENT_DIRS: Record<JasBlogContentType, string> = {
   note: 'notes',
   project: 'projects',
+  diary: 'diary',
   roadmap: 'roadmaps',
   graph: 'graphs',
 };
@@ -272,6 +297,7 @@ export const CONTENT_DIRS: Record<JasBlogContentType, string> = {
 export const FILE_EXTENSIONS: Record<ContentType, string> = {
   note: '.md',
   project: '.md',
+  diary: '.md',
   roadmap: '.md',
   graph: '.md',
   doc: '.md',

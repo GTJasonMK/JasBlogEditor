@@ -1,10 +1,13 @@
 import type { ProjectMetadata } from '@/types';
+import { useEditorStore } from '@/store';
 import { MarkdownRenderer } from '../MarkdownRenderer';
 import { TechStack } from '../TechStack';
+import { BackToTop } from '../BackToTop';
 
 interface ProjectPreviewProps {
   metadata: ProjectMetadata;
   content: string;
+  embedded?: boolean;
 }
 
 function preprocessAlerts(content: string): string {
@@ -15,25 +18,32 @@ function preprocessAlerts(content: string): string {
 }
 
 // 开源项目预览（与 JasBlog projects/[slug]/page.tsx 一致）
-export function ProjectPreview({ metadata, content }: ProjectPreviewProps) {
+export function ProjectPreview({ metadata, content, embedded = false }: ProjectPreviewProps) {
+  const setPreviewMode = useEditorStore((state) => state.setPreviewMode);
   return (
     <div className="max-w-4xl mx-auto px-6 py-12">
-      <span className="inline-flex items-center gap-1 text-[var(--color-gray)] hover:text-[var(--color-vermilion)] mb-6 transition-colors">
-        <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
-          <path
-            d="M10 12L6 8L10 4"
-            stroke="currentColor"
-            strokeWidth="1.5"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          />
-        </svg>
-        返回项目列表
-      </span>
+      {!embedded && (
+        <button
+          type="button"
+          onClick={() => setPreviewMode('list')}
+          className="inline-flex items-center gap-1 text-[var(--color-gray)] hover:text-[var(--color-vermilion)] mb-6 transition-colors"
+        >
+          <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+            <path
+              d="M10 12L6 8L10 4"
+              stroke="currentColor"
+              strokeWidth="1.5"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            />
+          </svg>
+          返回项目列表
+        </button>
+      )}
 
       {/* 项目头部 */}
       <header className="mb-8">
-        <h1 className="text-3xl font-bold mb-4">{metadata.title}</h1>
+        <h1 className="text-3xl font-bold mb-4">{metadata.name}</h1>
         <p className="text-lg text-[var(--color-gray)] mb-4">{metadata.description}</p>
 
         {/* 链接按钮 */}
@@ -85,6 +95,8 @@ export function ProjectPreview({ metadata, content }: ProjectPreviewProps) {
       <article className="prose-chinese">
         <MarkdownRenderer content={preprocessAlerts(content)} />
       </article>
+
+      <BackToTop />
     </div>
   );
 }

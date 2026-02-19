@@ -20,7 +20,16 @@ function ensureMdExtension(filePath: string): string {
 function normalizeBaseName(name: string): string {
   const trimmed = name.trim();
   if (!trimmed) return 'untitled';
-  return trimmed.replace(/\.md$/i, '');
+
+  // 保留子路径（Diary 常用 YYYY/MM/xxx.md），但移除扩展名与前导分隔符
+  const withoutExt = trimmed.replace(/\.md$/i, '');
+  return withoutExt.replace(/^[\\/]+/, '') || 'untitled';
+}
+
+function normalizeTitleFromPath(input: string): string {
+  const normalized = normalizeBaseName(input);
+  const lastSegment = normalized.split(/[/\\]/).pop() || '';
+  return lastSegment || 'untitled';
 }
 
 /**
@@ -41,10 +50,10 @@ export function buildDocFilePath(workspacePath: string, relativePath: string): s
 }
 
 /**
- * 生成 JasBlog 四类内容的默认 Markdown 模板
+ * 生成 JasBlog 内容的默认 Markdown 模板
  */
 export function createNewJasblogMarkdown(type: JasBlogContentType, filename: string): string {
-  const baseName = normalizeBaseName(filename);
+  const baseName = normalizeTitleFromPath(filename);
   const today = getToday();
 
   if (type === 'note') {
@@ -60,9 +69,10 @@ tags: []
 
   if (type === 'project') {
     return `---
-title: ${baseName}
+name: ${baseName}
 description:
 github:
+date: ${today}
 tags: []
 status: active
 ---
@@ -76,10 +86,27 @@ status: active
     return `---
 title: ${baseName}
 description:
+date: ${today}
 status: active
 ---
 
 - [ ] 示例任务
+`;
+  }
+
+  if (type === 'diary') {
+    return `---
+title: ${baseName}
+date: ${today}
+time: 09:00
+excerpt:
+tags: []
+mood:
+weather:
+location:
+companions: []
+---
+
 `;
   }
 

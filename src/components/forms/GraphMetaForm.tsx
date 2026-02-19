@@ -9,7 +9,7 @@ export function GraphMetaForm() {
 
   const metadata = currentFile.metadata as GraphMetadata;
   // 从正文内容实时提取图谱数据用于统计
-  const { graphData } = extractGraphFromContent(currentFile.content);
+  const { graphData, error } = extractGraphFromContent(currentFile.content);
 
   return (
     <div className="space-y-4">
@@ -49,6 +49,11 @@ export function GraphMetaForm() {
       {/* 统计信息 */}
       <div className="pt-4 border-t border-[var(--color-border)]">
         <h4 className="text-xs text-[var(--color-text-muted)] mb-2">统计信息</h4>
+        {error && (
+          <p className="text-xs text-[var(--color-danger)] mb-2">
+            图谱数据异常：{error}
+          </p>
+        )}
         <div className="grid grid-cols-2 gap-2">
           <div className="p-2 bg-[var(--color-paper)] rounded border border-[var(--color-border)]">
             <div className="text-lg font-medium text-[var(--color-text)]">{graphData.nodes.length}</div>

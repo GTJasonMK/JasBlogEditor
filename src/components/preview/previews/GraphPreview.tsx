@@ -1,32 +1,41 @@
 import type { GraphMetadata } from '@/types';
 import { extractGraphFromContent } from '@/services/contentParser';
 import { GraphViewer } from '@/components/graph';
+import { useEditorStore } from '@/store';
 import { MarkdownRenderer } from '../MarkdownRenderer';
 
 interface GraphPreviewProps {
   metadata: GraphMetadata;
   content: string;
+  embedded?: boolean;
 }
 
 // 知识图谱预览（与 JasBlog graphs/[slug]/page.tsx 一致）
-export function GraphPreview({ metadata, content }: GraphPreviewProps) {
+export function GraphPreview({ metadata, content, embedded = false }: GraphPreviewProps) {
+  const setPreviewMode = useEditorStore((state) => state.setPreviewMode);
   // 从正文内容中提取图谱数据
-  const { graphData, remainingContent } = extractGraphFromContent(content);
+  const { graphData, remainingContent, error } = extractGraphFromContent(content);
 
   return (
     <div className="max-w-6xl mx-auto px-6 py-12">
-      <span className="inline-flex items-center gap-1 text-[var(--color-gray)] mb-6 transition-colors">
-        <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
-          <path
-            d="M10 12L6 8L10 4"
-            stroke="currentColor"
-            strokeWidth="1.5"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          />
-        </svg>
-        返回图谱列表
-      </span>
+      {!embedded && (
+        <button
+          type="button"
+          onClick={() => setPreviewMode('list')}
+          className="inline-flex items-center gap-1 text-[var(--color-gray)] hover:text-[var(--color-vermilion)] mb-6 transition-colors"
+        >
+          <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+            <path
+              d="M10 12L6 8L10 4"
+              stroke="currentColor"
+              strokeWidth="1.5"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            />
+          </svg>
+          返回图谱列表
+        </button>
+      )}
 
       {/* 标题 */}
       <header className="mb-8">
@@ -50,8 +59,18 @@ export function GraphPreview({ metadata, content }: GraphPreviewProps) {
         </p>
       </div>
 
+      {error && (
+        <div className="mb-6 p-4 rounded-lg border border-[var(--color-danger)]/30 bg-[var(--color-danger)]/5 text-sm">
+          <p className="font-medium text-[var(--color-danger)] mb-1">图谱数据错误</p>
+          <p className="text-[var(--color-gray)]">{error}</p>
+          <p className="text-xs text-[var(--color-gray)] mt-2">
+            请确认文件包含 <span className="font-mono">```graph</span> 代码块，且 JSON 至少包含 nodes/edges 字段。
+          </p>
+        </div>
+      )}
+
       {/* 图谱查看器 */}
-      <GraphViewer data={graphData} />
+      {!error && <GraphViewer data={graphData} />}
 
       {/* 正文内容 */}
       {remainingContent.trim() && (

@@ -135,7 +135,9 @@ export function NewMenu({ disabled, workspaceType, onCreateJasblogFile, onCreate
               type="text"
               value={input}
               onChange={(e) => setInput(e.target.value)}
-              placeholder="请输入文件名（不含扩展名）"
+              placeholder={jasblogDialogType === 'diary'
+                ? '请输入相对路径（如: 2026/02/2026-02-18-09-00-morning-session）'
+                : '请输入文件名（不含扩展名）'}
               className="w-full px-3 py-2 border border-[var(--color-border)] rounded-md focus:outline-none focus:border-[var(--color-primary)] mb-4"
               autoFocus
               onKeyDown={(e) => {
@@ -143,6 +145,11 @@ export function NewMenu({ disabled, workspaceType, onCreateJasblogFile, onCreate
                 if (e.key === 'Escape') closeAllDialogs();
               }}
             />
+            {jasblogDialogType === 'diary' && (
+              <p className="text-xs text-[var(--color-text-muted)] mb-4">
+                Diary 建议使用 <span className="font-mono">YYYY/MM</span> 目录结构；目录不存在时会自动创建。
+              </p>
+            )}
             <div className="flex justify-end gap-2">
               <button
                 onClick={closeAllDialogs}
