@@ -232,6 +232,17 @@ export interface GraphMetadata {
   date?: string;
 }
 
+// 用户自定义模板
+export interface UserTemplate {
+  id: string;
+  name: string;
+  description?: string;
+  type: JasBlogContentType;
+  content: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
 // 文件信息
 export interface FileInfo {
   name: string;

@@ -1,7 +1,7 @@
 import type { OpenDialogOptions } from "@tauri-apps/plugin-dialog";
 import { isTauri } from "./runtime";
 import type { MiniModeSettings, WindowState } from "@/types";
-import type { RustFileInfo, RustSettings } from "./tauriTypes";
+import type { RustFileInfo, RustSettings, RustUserTemplate } from "./tauriTypes";
 
 /**
  * Tauri 调用封装
@@ -18,6 +18,8 @@ export type TauriCommandMap = {
   path_exists: { args: { path: string }; result: boolean };
   get_settings: { args: undefined; result: RustSettings };
   save_settings: { args: { settings: RustSettings }; result: void };
+  get_templates: { args: undefined; result: RustUserTemplate[] };
+  save_templates: { args: { templates: RustUserTemplate[] }; result: void };
 };
 
 type TypedArgs<C extends keyof TauriCommandMap> = TauriCommandMap[C]["args"];

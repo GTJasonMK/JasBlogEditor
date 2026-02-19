@@ -3,6 +3,7 @@ import type { KeyboardEvent as ReactKeyboardEvent } from 'react';
 import type { ReactNode } from 'react';
 import { invokeTauri } from '@/platform/tauri';
 import { parseMarkdownContent } from '@/services/contentParser';
+import { collectLeafFiles, normalizeSlashes } from '@/utils';
 import { CONTENT_TYPE_LABELS } from '@/types';
 import type { ContentType, DiaryMetadata, GraphMetadata, NoteMetadata, ProjectMetadata, RoadmapMetadata } from '@/types';
 import type { FileTreeNode } from '@/store/fileStore';
@@ -16,7 +17,7 @@ interface JasBlogSearchModalProps {
 interface SearchFile {
   path: string;
   name: string;
-  type: ContentType;
+  type: Exclude<ContentType, 'doc'>;
 }
 
 interface SearchIndexItem {
@@ -29,10 +30,6 @@ interface SearchIndexItem {
   extra: string;
   bodyText: string;
   searchText: string;
-}
-
-function normalizeSlashes(value: string): string {
-  return value.replace(/\\/g, '/');
 }
 
 function normalizeWhitespace(value: string): string {
@@ -248,25 +245,13 @@ function highlightText(text: string, query: string): ReactNode {
 }
 
 function collectSearchFiles(nodes: FileTreeNode[]): SearchFile[] {
-  const results: SearchFile[] = [];
-  const queue = [...nodes];
-
-  while (queue.length > 0) {
-    const node = queue.shift();
-    if (!node) continue;
-
-    if (node.isDir) {
-      if (node.children?.length) queue.push(...node.children);
-      continue;
-    }
-
-    const type = node.contentType;
-    if (!type || type === 'doc') continue;
-
-    results.push({ path: node.path, name: node.name, type });
-  }
-
-  return results;
+  return collectLeafFiles(nodes)
+    .map((node) => {
+      const type = node.contentType;
+      if (!type || type === 'doc') return null;
+      return { path: node.path, name: node.name, type } satisfies SearchFile;
+    })
+    .filter((item): item is SearchFile => item !== null);
 }
 
 function computeScore(item: SearchIndexItem, terms: string[]): number {

@@ -33,7 +33,7 @@ export function DocsSidebar() {
 
   const handleRename = () => {
     if (!contextMenu.file) return;
-    const name = contextMenu.file.name.replace(/\.md$/, '');
+    const name = contextMenu.file.name.replace(/\.md$/i, '');
     setRenameDialog({ visible: true, file: contextMenu.file, newName: name });
     setContextMenu(prev => ({ ...prev, visible: false }));
   };

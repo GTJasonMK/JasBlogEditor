@@ -16,6 +16,19 @@ export default defineConfig(async () => ({
     },
   },
   clearScreen: false,
+  build: {
+    rollupOptions: {
+      output: {
+        // 将重型库拆分为独立 chunk，配合懒加载减小首屏体积
+        manualChunks: {
+          'vendor-react': ['react', 'react-dom', 'zustand'],
+          'vendor-markdown': ['react-markdown', 'remark-gfm', 'remark-math', 'rehype-highlight', 'katex', 'rehype-katex'],
+          'vendor-mermaid': ['mermaid'],
+          'vendor-graph': ['@xyflow/react'],
+        },
+      },
+    },
+  },
   server: {
     port: devPort,
     // 默认允许自动切换端口（提升纯 Web 开发体验）。

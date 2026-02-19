@@ -4,7 +4,6 @@
  */
 
 import type { EditorFile } from '@/types';
-import { MarkdownRenderer } from './MarkdownRenderer';
 import { CONTENT_TYPE_UI } from '@/config/contentTypeUi';
 
 interface ContentPreviewProps {
@@ -14,12 +13,5 @@ interface ContentPreviewProps {
 
 export function ContentPreview({ file, bodyContent }: ContentPreviewProps) {
   const config = CONTENT_TYPE_UI[file.type];
-  if (config) return config.renderPreview(file, bodyContent);
-
-  // 理论上不会走到这里：ContentType 已被穷举
-  return (
-    <article className="prose-chinese">
-      <MarkdownRenderer content={bodyContent} />
-    </article>
-  );
+  return config.renderPreview(file, bodyContent);
 }

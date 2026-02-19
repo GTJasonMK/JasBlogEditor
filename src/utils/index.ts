@@ -5,4 +5,5 @@
 export { extractText, generateId } from './text';
 export { debounce, createDebouncedFn } from './debounce';
 export { applyTheme, getEffectiveTheme, setupSystemThemeListener } from './theme';
-export { getPathSeparator, getParentDir, renameSiblingPath } from './path';
+export { normalizeSlashes, isSamePath, getPathSeparator, getParentDir, renameSiblingPath } from './path';
+export { collectLeafFiles, collectLeafFilesByType } from './fileTree';

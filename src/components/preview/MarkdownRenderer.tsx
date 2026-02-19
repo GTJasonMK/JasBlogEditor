@@ -1,4 +1,4 @@
-import { useState, useCallback, type ReactNode } from "react";
+import { useState, useCallback, useEffect, useRef, type ReactNode } from "react";
 import Markdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import remarkMath from "remark-math";
@@ -20,12 +20,31 @@ function preprocessAlerts(content: string): string {
 // 代码块复制按钮组件
 function CopyButton({ code }: { code: string }) {
   const [copied, setCopied] = useState(false);
+  const timeoutRef = useRef<number | null>(null);
 
   const handleCopy = useCallback(async () => {
-    await navigator.clipboard.writeText(code);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
+    try {
+      await navigator.clipboard.writeText(code);
+      setCopied(true);
+      if (timeoutRef.current !== null) {
+        clearTimeout(timeoutRef.current);
+      }
+      timeoutRef.current = window.setTimeout(() => {
+        setCopied(false);
+        timeoutRef.current = null;
+      }, 2000);
+    } catch (error) {
+      console.error("复制代码失败:", error);
+    }
   }, [code]);
+
+  useEffect(() => {
+    return () => {
+      if (timeoutRef.current !== null) {
+        clearTimeout(timeoutRef.current);
+      }
+    };
+  }, []);
 
   return (
     <button
@@ -158,29 +177,36 @@ const ALERT_CONFIG: Record<
 
 // 标题组件（带锚点链接）
 function Heading({
+  headingId,
   level,
   children,
   ...props
 }: {
+  headingId: string;
   level: 1 | 2 | 3 | 4;
   children?: ReactNode;
   [key: string]: unknown;
 }) {
   const text = extractText(children);
-  const id = generateId(text);
   const Tag = `h${level}` as const;
 
   return (
-    <Tag id={id} className="group/heading relative" {...props}>
+    <Tag id={headingId} className="group/heading relative" {...props}>
       {children}
       <a
-        href={`#${id}`}
+        href={`#${headingId}`}
         className="heading-anchor"
         aria-label={`Link to ${text}`}
         onClick={(e) => {
           e.preventDefault();
-          document.getElementById(id)?.scrollIntoView({ behavior: "smooth" });
-          history.replaceState(null, "", `#${id}`);
+          // 优先滚动当前标题元素，避免页面上存在同名 id 时跳错位置
+          const currentHeading = e.currentTarget.parentElement;
+          if (currentHeading instanceof HTMLElement) {
+            currentHeading.scrollIntoView({ behavior: "smooth" });
+          } else {
+            document.getElementById(headingId)?.scrollIntoView({ behavior: "smooth" });
+          }
+          history.replaceState(null, "", `#${headingId}`);
         }}
       >
         #
@@ -229,6 +255,15 @@ interface MarkdownRendererProps {
 
 export function MarkdownRenderer({ content }: MarkdownRendererProps) {
   const processed = preprocessAlerts(content);
+  const headingIdCounts = new Map<string, number>();
+  const resolveHeadingId = (text: string): string => {
+    const baseId = generateId(text);
+    const current = headingIdCounts.get(baseId) || 0;
+    const next = current + 1;
+    headingIdCounts.set(baseId, next);
+    return current === 0 ? baseId : `${baseId}-${current}`;
+  };
+
   return (
     <Markdown
       remarkPlugins={[remarkGfm, remarkMath]}
@@ -236,22 +271,22 @@ export function MarkdownRenderer({ content }: MarkdownRendererProps) {
       components={{
         // 标题
         h1: ({ children, ...props }) => (
-          <Heading level={1} {...props}>
+          <Heading headingId={resolveHeadingId(extractText(children))} level={1} {...props}>
             {children}
           </Heading>
         ),
         h2: ({ children, ...props }) => (
-          <Heading level={2} {...props}>
+          <Heading headingId={resolveHeadingId(extractText(children))} level={2} {...props}>
             {children}
           </Heading>
         ),
         h3: ({ children, ...props }) => (
-          <Heading level={3} {...props}>
+          <Heading headingId={resolveHeadingId(extractText(children))} level={3} {...props}>
             {children}
           </Heading>
         ),
         h4: ({ children, ...props }) => (
-          <Heading level={4} {...props}>
+          <Heading headingId={resolveHeadingId(extractText(children))} level={4} {...props}>
             {children}
           </Heading>
         ),

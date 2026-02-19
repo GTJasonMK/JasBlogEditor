@@ -1,5 +1,6 @@
 import type { DocMetadata } from '@/types';
 import { MarkdownRenderer } from '../MarkdownRenderer';
+import { PreviewDate } from '../PreviewMeta';
 
 interface DocPreviewProps {
   metadata: DocMetadata;
@@ -13,9 +14,7 @@ export function DocPreview({ metadata, content }: DocPreviewProps) {
       {/* 文档头部 */}
       {(metadata.title || metadata.date) && (
         <header className="mb-8">
-          {metadata.date && (
-            <time className="text-sm text-[var(--color-gray)]">{metadata.date}</time>
-          )}
+          <PreviewDate date={metadata.date} />
           {metadata.title && (
             <h1 className="text-3xl font-bold mt-2 mb-4 text-[var(--color-text)]">{metadata.title}</h1>
           )}
@@ -30,4 +29,3 @@ export function DocPreview({ metadata, content }: DocPreviewProps) {
     </div>
   );
 }
-

@@ -20,6 +20,14 @@ import type {
   LineEnding,
 } from '@/types';
 
+function getLocalDateString(): string {
+  const now = new Date();
+  const year = now.getFullYear();
+  const month = String(now.getMonth() + 1).padStart(2, '0');
+  const day = String(now.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+}
+
 /**
  * 解析 Markdown 内容
  * 从 raw 文本中提取 YAML frontmatter 和正文内容
@@ -76,7 +84,7 @@ function buildMetadata(
   parsed: Record<string, unknown>,
   type: ContentType
 ): NoteMetadata | ProjectMetadata | DiaryMetadata | RoadmapMetadata | GraphMetadata | DocMetadata {
-  const today = new Date().toISOString().split('T')[0];
+  const today = getLocalDateString();
 
   if (type === 'note') {
     return {
@@ -279,9 +287,9 @@ export function parseRoadmapItemsFromContent(content: string): { items: RoadmapI
   let itemId = 1;
 
   // 任务行正则：- [ ] 或 - [-] 或 - [x] 开头，后面是标题，可选 `priority`
-  const taskRegex = /^-\s*\[([ x\-])\]\s+(.+?)(?:\s+`(high|medium|low)`)?\s*$/;
-  // 缩进行正则（至少2个空格）
-  const indentRegex = /^(\s{2,})(.+)$/;
+  const taskRegex = /^-\s*\[([ xX\-])\]\s+(.+?)(?:\s+`(high|medium|low)`)?\s*$/;
+  // 缩进行正则（至少2个空格或1个 Tab）
+  const indentRegex = /^(?:\t| {2,})(.+)$/;
   // 截止日期正则
   const deadlineRegex = /^截止[:：]\s*(.+)$/;
   // 完成日期正则
@@ -344,9 +352,10 @@ export function parseRoadmapItemsFromContent(content: string): { items: RoadmapI
 
       // 解析新任务
       const [, checkbox, title, priority] = taskMatch;
+      const normalizedCheckbox = checkbox.toLowerCase();
       let status: RoadmapItemStatus = 'todo';
-      if (checkbox === 'x') status = 'done';
-      else if (checkbox === '-') status = 'in_progress';
+      if (normalizedCheckbox === 'x') status = 'done';
+      else if (normalizedCheckbox === '-') status = 'in_progress';
 
       currentItem = {
         id: String(itemId++),
@@ -358,7 +367,7 @@ export function parseRoadmapItemsFromContent(content: string): { items: RoadmapI
       // 当前有任务，检查是否是缩进的描述行
       const indentMatch = line.match(indentRegex);
       if (indentMatch) {
-        const text = indentMatch[2];
+        const text = indentMatch[1];
         const deadlineMatch = text.match(deadlineRegex);
         const completedAtMatch = text.match(completedAtRegex);
 
@@ -700,7 +709,7 @@ export function serializeGraphToContent(
  * 获取默认元数据
  */
 function getDefaultMetadata(type: ContentType): NoteMetadata | ProjectMetadata | DiaryMetadata | RoadmapMetadata | GraphMetadata | DocMetadata {
-  const today = new Date().toISOString().split('T')[0];
+  const today = getLocalDateString();
 
   if (type === 'note') {
     return {

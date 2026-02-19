@@ -1,6 +1,6 @@
 import { useCallback, useEffect } from "react";
 import { Toolbar, Sidebar, EditorArea, MetadataPanel, MiniModeLayout } from "@/components";
-import { useSettingsStore, useFileStore, useEditorStore, useWindowStore } from "@/store";
+import { useSettingsStore, useFileStore, useEditorStore, useWindowStore, useTemplateStore } from "@/store";
 import { useGlobalShortcutsEffect, useSaveShortcutEffect, useThemeEffect, useWorkspaceInitEffect } from "@/hooks";
 
 function App() {
@@ -9,11 +9,13 @@ function App() {
   const saveFile = useEditorStore((state) => state.saveFile);
   const currentFile = useEditorStore((state) => state.currentFile);
   const miniMode = useWindowStore((state) => state.miniMode);
+  const loadTemplates = useTemplateStore((state) => state.loadTemplates);
 
-  // 初始化：加载设置
+  // 初始化：加载设置和模板
   useEffect(() => {
     loadSettings();
-  }, [loadSettings]);
+    loadTemplates();
+  }, [loadSettings, loadTemplates]);
 
   useThemeEffect(settings.theme);
 

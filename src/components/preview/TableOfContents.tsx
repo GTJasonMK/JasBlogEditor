@@ -16,6 +16,7 @@ interface TableOfContentsProps {
 function extractHeadings(content: string): TocItem[] {
   const headingRegex = /^(#{2,4})\s+(.+)$/gm;
   const visibleLines: string[] = [];
+  const headingIdCounts = new Map<string, number>();
 
   let inFence = false;
   let fenceChar = '';
@@ -49,7 +50,11 @@ function extractHeadings(content: string): TocItem[] {
   while ((match = headingRegex.exec(source)) !== null) {
     const level = match[1].length;
     const text = match[2].trim();
-    const id = generateId(text);
+    const baseId = generateId(text);
+    const current = headingIdCounts.get(baseId) || 0;
+    const next = current + 1;
+    headingIdCounts.set(baseId, next);
+    const id = current === 0 ? baseId : `${baseId}-${current}`;
     headings.push({ id, text, level });
   }
 
@@ -73,6 +78,11 @@ export function TableOfContents({ content, offsetTop = 100 }: TableOfContentsPro
 
   const navRef = useRef<HTMLElement>(null);
   const activeItemRef = useRef<HTMLAnchorElement>(null);
+  const activeIdRef = useRef<string>('');
+
+  useEffect(() => {
+    activeIdRef.current = activeId;
+  }, [activeId]);
 
   // 从 Markdown 内容中提取标题（与 JasBlog TableOfContents.tsx 逻辑一致）
   useEffect(() => {
@@ -131,7 +141,7 @@ export function TableOfContents({ content, offsetTop = 100 }: TableOfContentsPro
         currentId = items[0].id;
       }
 
-      if (currentId && currentId !== activeId) {
+      if (currentId && currentId !== activeIdRef.current) {
         setActiveId(currentId);
       }
     };
@@ -139,7 +149,7 @@ export function TableOfContents({ content, offsetTop = 100 }: TableOfContentsPro
     handleScroll();
     scrollContainer.addEventListener('scroll', handleScroll, { passive: true });
     return () => scrollContainer.removeEventListener('scroll', handleScroll);
-  }, [scrollContainer, items, activeId, offsetTop]);
+  }, [scrollContainer, items, offsetTop]);
 
   const handleClick = useCallback((e: React.MouseEvent<HTMLAnchorElement>, id: string) => {
     e.preventDefault();

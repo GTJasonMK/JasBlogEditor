@@ -1,8 +1,9 @@
 import type { ProjectMetadata } from '@/types';
-import { useEditorStore } from '@/store';
 import { MarkdownRenderer } from '../MarkdownRenderer';
 import { TechStack } from '../TechStack';
 import { BackToTop } from '../BackToTop';
+import { PreviewBackButton } from '../PreviewBackButton';
+import { PreviewDescription, PreviewTagList } from '../PreviewMeta';
 
 interface ProjectPreviewProps {
   metadata: ProjectMetadata;
@@ -10,41 +11,18 @@ interface ProjectPreviewProps {
   embedded?: boolean;
 }
 
-function preprocessAlerts(content: string): string {
-  return content.replace(
-    /^(>\s*)\[!(NOTE|TIP|IMPORTANT|WARNING|CAUTION)\]\r?\n?/gm,
-    '$1ALERTBOX$2ALERTBOX\n',
-  );
-}
-
 // 开源项目预览（与 JasBlog projects/[slug]/page.tsx 一致）
 export function ProjectPreview({ metadata, content, embedded = false }: ProjectPreviewProps) {
-  const setPreviewMode = useEditorStore((state) => state.setPreviewMode);
   return (
     <div className="max-w-4xl mx-auto px-6 py-12">
       {!embedded && (
-        <button
-          type="button"
-          onClick={() => setPreviewMode('list')}
-          className="inline-flex items-center gap-1 text-[var(--color-gray)] hover:text-[var(--color-vermilion)] mb-6 transition-colors"
-        >
-          <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
-            <path
-              d="M10 12L6 8L10 4"
-              stroke="currentColor"
-              strokeWidth="1.5"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            />
-          </svg>
-          返回项目列表
-        </button>
+        <PreviewBackButton label="返回项目列表" />
       )}
 
       {/* 项目头部 */}
       <header className="mb-8">
         <h1 className="text-3xl font-bold mb-4">{metadata.name}</h1>
-        <p className="text-lg text-[var(--color-gray)] mb-4">{metadata.description}</p>
+        <PreviewDescription text={metadata.description} className="text-lg text-[var(--color-gray)] mb-4" />
 
         {/* 链接按钮 */}
         <div className="flex flex-wrap gap-3 mb-6">
@@ -79,11 +57,7 @@ export function ProjectPreview({ metadata, content, embedded = false }: ProjectP
         </div>
 
         {/* 标签 */}
-        <div className="flex flex-wrap gap-2 mb-6">
-          {metadata.tags?.map((tag) => (
-            <span key={tag} className="tag">{tag}</span>
-          ))}
-        </div>
+        <PreviewTagList tags={metadata.tags} className="mb-6" />
 
         {/* 技术栈 */}
         <TechStack items={metadata.techStack ?? []} />
@@ -93,7 +67,7 @@ export function ProjectPreview({ metadata, content, embedded = false }: ProjectP
 
       {/* 项目内容 */}
       <article className="prose-chinese">
-        <MarkdownRenderer content={preprocessAlerts(content)} />
+        <MarkdownRenderer content={content} />
       </article>
 
       <BackToTop />

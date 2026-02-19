@@ -23,8 +23,13 @@ export function extractText(children: ReactNode): string {
  * 支持中文字符
  */
 export function generateId(text: string): string {
-  return text
+  const normalized = text
     .toLowerCase()
+    .trim()
     .replace(/\s+/g, '-')
-    .replace(/[^\w\u4e00-\u9fa5-]/g, '');
+    .replace(/[^\w\u4e00-\u9fa5-]/g, '')
+    .replace(/^-+|-+$/g, '');
+
+  // 兜底：避免纯符号标题生成空 id，导致 querySelector('#') 抛错
+  return normalized || 'section';
 }

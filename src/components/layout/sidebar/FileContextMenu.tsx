@@ -9,6 +9,11 @@ interface FileContextMenuProps {
   onClose: () => void;
 }
 
+function clampMenuCoordinate(value: number, size: number, viewport: number, padding = 8): number {
+  const max = Math.max(padding, viewport - size - padding);
+  return Math.min(Math.max(padding, value), max);
+}
+
 /**
  * 侧边栏文件右键菜单（重命名 / 删除）
  */
@@ -38,11 +43,16 @@ export function FileContextMenu({
 
   if (!visible) return null;
 
+  const menuWidth = 168;
+  const menuHeight = 96;
+  const left = clampMenuCoordinate(x, menuWidth, window.innerWidth);
+  const top = clampMenuCoordinate(y, menuHeight, window.innerHeight);
+
   return (
     <div
       ref={menuRef}
       className="fixed bg-[var(--color-paper)] border border-[var(--color-border)] rounded-md shadow-lg py-1 z-50"
-      style={{ left: x, top: y }}
+      style={{ left, top }}
     >
       <button
         onClick={onRename}
@@ -65,4 +75,3 @@ export function FileContextMenu({
     </div>
   );
 }
-

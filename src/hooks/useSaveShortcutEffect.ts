@@ -14,7 +14,8 @@ export function useSaveShortcutEffect(options: UseSaveShortcutEffectOptions): vo
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       // Ctrl+S 保存
-      if (e.ctrlKey && !e.altKey && e.key === "s") {
+      const isSaveHotkey = (e.ctrlKey || e.metaKey) && !e.altKey && e.key.toLowerCase() === "s";
+      if (isSaveHotkey) {
         e.preventDefault();
         if (enabled) {
           void onSave();
@@ -26,4 +27,3 @@ export function useSaveShortcutEffect(options: UseSaveShortcutEffectOptions): vo
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [enabled, onSave]);
 }
-

@@ -1,7 +1,9 @@
-import { useEffect, useMemo, useState } from 'react';
+import { type ReactNode, useCallback, useEffect, useMemo, useState } from 'react';
 import { isTauri } from '@/platform/runtime';
 import { invokeTauri } from '@/platform/tauri';
+import { buildDiaryEntryId, inferDiaryFromFileName, resolveDiaryDate } from '@/services/diary';
 import { parseMarkdownContent, extractGraphFromContent, parseRoadmapItemsFromContent } from '@/services/contentParser';
+import { collectLeafFilesByType, isSamePath } from '@/utils';
 import { BackToTop } from './BackToTop';
 import type {
   DiaryMetadata,
@@ -13,7 +15,6 @@ import type {
   RoadmapMetadata,
   TechStackItem,
 } from '@/types';
-import type { FileTreeNode } from '@/store/fileStore';
 import { useEditorStore, useFileStore } from '@/store';
 
 interface JasBlogListPreviewProps {
@@ -21,42 +22,180 @@ interface JasBlogListPreviewProps {
   activeBodyContent: string;
 }
 
-function normalizeSlashes(value: string): string {
-  return value.replace(/\\/g, '/');
-}
-
-function isSamePath(a: string, b: string): boolean {
-  return normalizeSlashes(a).toLowerCase() === normalizeSlashes(b).toLowerCase();
-}
-
 function getSlugFromName(fileName: string): string {
   return fileName.replace(/\.md$/i, '');
-}
-
-function collectLeafFiles(nodes: FileTreeNode[], contentType: EditorFile['type']): FileTreeNode[] {
-  const results: FileTreeNode[] = [];
-  const queue = [...nodes];
-
-  while (queue.length > 0) {
-    const node = queue.shift();
-    if (!node) continue;
-
-    if (node.isDir) {
-      if (node.children?.length) queue.push(...node.children);
-      continue;
-    }
-
-    if (node.contentType === contentType) {
-      results.push(node);
-    }
-  }
-
-  return results;
 }
 
 function sortByDateDesc(a: { date: string }, b: { date: string }): number {
   if (a.date === b.date) return 0;
   return a.date > b.date ? -1 : 1;
+}
+
+interface PreviewDataCacheEntry<T> {
+  workspacePath: string;
+  fileTreeVersion: number;
+  data: T;
+}
+
+interface UseCachedPreviewDataOptions<T> {
+  cacheKey: string;
+  workspacePath: string | null;
+  fileTreeVersion: number;
+  loadData: () => Promise<T>;
+  emptyValue: () => T;
+  errorLabel: string;
+}
+
+const previewDataCache = new Map<string, PreviewDataCacheEntry<unknown>>();
+
+type DateSortedListItem = {
+  path: string;
+  date: string;
+};
+
+type OpenDetailContentType = Extract<EditorFile['type'], 'note' | 'project' | 'graph' | 'roadmap'>;
+
+function readCachedPreviewData<T>(
+  cacheKey: string,
+  workspacePath: string,
+  fileTreeVersion: number
+): T | null {
+  const cached = previewDataCache.get(cacheKey);
+  if (!cached) return null;
+  if (cached.workspacePath !== workspacePath) return null;
+  if (cached.fileTreeVersion !== fileTreeVersion) return null;
+  return cached.data as T;
+}
+
+function writeCachedPreviewData<T>(
+  cacheKey: string,
+  workspacePath: string,
+  fileTreeVersion: number,
+  data: T
+): void {
+  previewDataCache.set(cacheKey, {
+    workspacePath,
+    fileTreeVersion,
+    data,
+  } satisfies PreviewDataCacheEntry<T>);
+}
+
+function useCachedPreviewData<T>(options: UseCachedPreviewDataOptions<T>): {
+  data: T;
+  loading: boolean;
+  error: string | null;
+} {
+  const {
+    cacheKey,
+    workspacePath,
+    fileTreeVersion,
+    loadData,
+    emptyValue,
+    errorLabel,
+  } = options;
+
+  const [data, setData] = useState<T>(() => emptyValue());
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function load() {
+      setError(null);
+
+      if (workspacePath) {
+        const cached = readCachedPreviewData<T>(cacheKey, workspacePath, fileTreeVersion);
+        if (cached !== null) {
+          setData(cached);
+          setLoading(false);
+          return;
+        }
+      }
+
+      setLoading(true);
+
+      try {
+        const nextData = await loadData();
+        if (cancelled) return;
+
+        setData(nextData);
+
+        if (workspacePath) {
+          writeCachedPreviewData(cacheKey, workspacePath, fileTreeVersion, nextData);
+        }
+      } catch (e) {
+        console.error(`${errorLabel}失败:`, e);
+        if (!cancelled) {
+          setData(emptyValue());
+          setError(String(e));
+        }
+      } finally {
+        if (!cancelled) {
+          setLoading(false);
+        }
+      }
+    }
+
+    void load();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [cacheKey, workspacePath, fileTreeVersion, loadData, emptyValue, errorLabel]);
+
+  return { data, loading, error };
+}
+
+function useMergedActiveItemList<T extends DateSortedListItem>(
+  diskItems: T[],
+  activeItem: T,
+  activePath: string
+): T[] {
+  return useMemo(() => {
+    const merged = [...diskItems.filter((item) => !isSamePath(item.path, activePath)), activeItem];
+    merged.sort(sortByDateDesc);
+    return merged;
+  }, [diskItems, activeItem, activePath]);
+}
+
+function useOpenDetailByPath(options: {
+  activePath: string;
+  contentType: OpenDetailContentType;
+  openFile: (path: string, type: EditorFile['type']) => Promise<void>;
+  setPreviewMode: (mode: 'list' | 'detail') => void;
+}): (path: string) => Promise<void> {
+  const { activePath, contentType, openFile, setPreviewMode } = options;
+
+  return useCallback(async (path: string) => {
+    if (isSamePath(path, activePath)) {
+      setPreviewMode('detail');
+      return;
+    }
+
+    await openFile(path, contentType);
+    setPreviewMode('detail');
+  }, [activePath, contentType, openFile, setPreviewMode]);
+}
+
+function PreviewLoadState({
+  loading,
+  error,
+  children,
+}: {
+  loading: boolean;
+  error: string | null;
+  children: ReactNode;
+}) {
+  if (loading) {
+    return <p className="text-sm text-[var(--color-gray)]">加载中...</p>;
+  }
+
+  if (error) {
+    return <p className="text-sm text-[var(--color-danger)]">加载失败：{error}</p>;
+  }
+
+  return <>{children}</>;
 }
 
 export function JasBlogListPreview({ activeFile, activeBodyContent }: JasBlogListPreviewProps) {
@@ -111,7 +250,7 @@ interface NoteListItem {
   tags: string[];
 }
 
-let notesListCache: { workspacePath: string; fileTreeVersion: number; items: NoteListItem[] } | null = null;
+const emptyNoteListItems = (): NoteListItem[] => [];
 
 function NotesListPreview({ activeFile }: { activeFile: EditorFile }) {
   const { fileTree, fileTreeVersion, workspacePath } = useFileStore();
@@ -120,7 +259,7 @@ function NotesListPreview({ activeFile }: { activeFile: EditorFile }) {
   const selectedTag = useEditorStore((state) => state.notesListTag);
   const setSelectedTag = useEditorStore((state) => state.setNotesListTag);
 
-  const noteFiles = useMemo(() => collectLeafFiles(fileTree, 'note'), [fileTree]);
+  const noteFiles = useMemo(() => collectLeafFilesByType(fileTree, 'note'), [fileTree]);
   const activePath = activeFile.path;
   const activeSlug = getSlugFromName(activeFile.name);
   const activeMeta = activeFile.metadata as NoteMetadata;
@@ -134,72 +273,39 @@ function NotesListPreview({ activeFile }: { activeFile: EditorFile }) {
     tags: activeMeta.tags || [],
   }), [activePath, activeSlug, activeMeta]);
 
-  const [diskItems, setDiskItems] = useState<NoteListItem[]>([]);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const loadNoteItems = useCallback(async (): Promise<NoteListItem[]> => {
+    const items = await Promise.all(
+      noteFiles.map(async (node) => {
+        const raw = await invokeTauri('read_file', { path: node.path });
+        const parsed = parseMarkdownContent(raw, 'note');
+        const meta = parsed.metadata as NoteMetadata;
+        const slug = getSlugFromName(node.name);
 
-  useEffect(() => {
-    let cancelled = false;
+        return {
+          path: node.path,
+          slug,
+          title: meta.title || slug,
+          date: meta.date || '',
+          excerpt: meta.excerpt || '',
+          tags: meta.tags || [],
+        } satisfies NoteListItem;
+      })
+    );
 
-    async function load() {
-      setError(null);
-      const cache = workspacePath ? notesListCache : null;
-      if (workspacePath && cache?.workspacePath === workspacePath && cache.fileTreeVersion === fileTreeVersion) {
-        setDiskItems(cache.items);
-        setLoading(false);
-        return;
-      }
+    items.sort(sortByDateDesc);
+    return items;
+  }, [noteFiles]);
 
-      setLoading(true);
+  const { data: diskItems, loading, error } = useCachedPreviewData<NoteListItem[]>({
+    cacheKey: 'notes-list',
+    workspacePath,
+    fileTreeVersion,
+    loadData: loadNoteItems,
+    emptyValue: emptyNoteListItems,
+    errorLabel: '加载 notes 列表',
+  });
 
-      try {
-        const items = await Promise.all(
-          noteFiles
-            .map(async (node) => {
-              const raw = await invokeTauri('read_file', { path: node.path });
-              const parsed = parseMarkdownContent(raw, 'note');
-              const meta = parsed.metadata as NoteMetadata;
-              const slug = getSlugFromName(node.name);
-
-              return {
-                path: node.path,
-                slug,
-                title: meta.title || slug,
-                date: meta.date || '',
-                excerpt: meta.excerpt || '',
-                tags: meta.tags || [],
-              } satisfies NoteListItem;
-            })
-        );
-
-        items.sort(sortByDateDesc);
-
-        if (!cancelled) {
-          setDiskItems(items);
-          if (workspacePath) {
-            notesListCache = { workspacePath, fileTreeVersion, items };
-          }
-        }
-      } catch (e) {
-        console.error('加载 notes 列表失败:', e);
-        if (!cancelled) {
-          setDiskItems([]);
-          setError(String(e));
-        }
-      } finally {
-        if (!cancelled) setLoading(false);
-      }
-    }
-
-    load();
-    return () => { cancelled = true; };
-  }, [noteFiles, workspacePath, fileTreeVersion]);
-
-  const items = useMemo(() => {
-    const merged = [...diskItems.filter((item) => !isSamePath(item.path, activePath)), activeItem];
-    merged.sort(sortByDateDesc);
-    return merged;
-  }, [diskItems, activeItem, activePath]);
+  const items = useMergedActiveItemList(diskItems, activeItem, activePath);
 
   const allTags = useMemo(() => {
     const tagSet = new Set<string>();
@@ -218,15 +324,12 @@ function NotesListPreview({ activeFile }: { activeFile: EditorFile }) {
     return items.filter((item) => item.tags.includes(selectedTag));
   }, [items, selectedTag]);
 
-  async function openNote(path: string) {
-    if (isSamePath(path, activePath)) {
-      setPreviewMode('detail');
-      return;
-    }
-
-    await openFile(path, 'note');
-    setPreviewMode('detail');
-  }
+  const openNote = useOpenDetailByPath({
+    activePath,
+    contentType: 'note',
+    openFile,
+    setPreviewMode,
+  });
 
   return (
     <div className="max-w-4xl mx-auto px-6 py-12">
@@ -237,15 +340,7 @@ function NotesListPreview({ activeFile }: { activeFile: EditorFile }) {
         </p>
       </header>
 
-      {loading && (
-        <p className="text-sm text-[var(--color-gray)]">加载中...</p>
-      )}
-
-      {!loading && error && (
-        <p className="text-sm text-[var(--color-danger)]">加载失败：{error}</p>
-      )}
-
-      {!loading && !error && (
+      <PreviewLoadState loading={loading} error={error}>
         <>
           {allTags.length > 0 && (
             <div className="mb-8">
@@ -313,7 +408,7 @@ function NotesListPreview({ activeFile }: { activeFile: EditorFile }) {
             </p>
           )}
         </>
-      )}
+      </PreviewLoadState>
 
       <BackToTop />
     </div>
@@ -334,12 +429,12 @@ interface ProjectListItem {
   techStack: TechStackItem[];
 }
 
-let projectsListCache: { workspacePath: string; fileTreeVersion: number; items: ProjectListItem[] } | null = null;
+const emptyProjectListItems = (): ProjectListItem[] => [];
 
 function ProjectsListPreview({ activeFile }: { activeFile: EditorFile }) {
   const { fileTree, fileTreeVersion, workspacePath } = useFileStore();
   const { openFile, setPreviewMode } = useEditorStore();
-  const projectFiles = useMemo(() => collectLeafFiles(fileTree, 'project'), [fileTree]);
+  const projectFiles = useMemo(() => collectLeafFilesByType(fileTree, 'project'), [fileTree]);
 
   const activePath = activeFile.path;
   const activeSlug = getSlugFromName(activeFile.name);
@@ -355,83 +450,47 @@ function ProjectsListPreview({ activeFile }: { activeFile: EditorFile }) {
     techStack: activeMeta.techStack || [],
   }), [activePath, activeSlug, activeMeta]);
 
-  const [diskItems, setDiskItems] = useState<ProjectListItem[]>([]);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const loadProjectItems = useCallback(async (): Promise<ProjectListItem[]> => {
+    const items = await Promise.all(
+      projectFiles.map(async (node) => {
+        const raw = await invokeTauri('read_file', { path: node.path });
+        const parsed = parseMarkdownContent(raw, 'project');
+        const meta = parsed.metadata as ProjectMetadata;
+        const slug = getSlugFromName(node.name);
 
-  useEffect(() => {
-    let cancelled = false;
+        return {
+          path: node.path,
+          slug,
+          name: meta.name || slug,
+          description: meta.description || '',
+          date: meta.date || '',
+          tags: meta.tags || [],
+          techStack: meta.techStack || [],
+        } satisfies ProjectListItem;
+      })
+    );
 
-    async function load() {
-      setError(null);
-      const cache = workspacePath ? projectsListCache : null;
-      if (workspacePath && cache?.workspacePath === workspacePath && cache.fileTreeVersion === fileTreeVersion) {
-        setDiskItems(cache.items);
-        setLoading(false);
-        return;
-      }
+    items.sort(sortByDateDesc);
+    return items;
+  }, [projectFiles]);
 
-      setLoading(true);
+  const { data: diskItems, loading, error } = useCachedPreviewData<ProjectListItem[]>({
+    cacheKey: 'projects-list',
+    workspacePath,
+    fileTreeVersion,
+    loadData: loadProjectItems,
+    emptyValue: emptyProjectListItems,
+    errorLabel: '加载 projects 列表',
+  });
 
-      try {
-        const items = await Promise.all(
-          projectFiles
-            .map(async (node) => {
-              const raw = await invokeTauri('read_file', { path: node.path });
-              const parsed = parseMarkdownContent(raw, 'project');
-              const meta = parsed.metadata as ProjectMetadata;
-              const slug = getSlugFromName(node.name);
+  const items = useMergedActiveItemList(diskItems, activeItem, activePath);
 
-              return {
-                path: node.path,
-                slug,
-                name: meta.name || slug,
-                description: meta.description || '',
-                date: meta.date || '',
-                tags: meta.tags || [],
-                techStack: meta.techStack || [],
-              } satisfies ProjectListItem;
-            })
-        );
-
-        items.sort(sortByDateDesc);
-
-        if (!cancelled) {
-          setDiskItems(items);
-          if (workspacePath) {
-            projectsListCache = { workspacePath, fileTreeVersion, items };
-          }
-        }
-      } catch (e) {
-        console.error('加载 projects 列表失败:', e);
-        if (!cancelled) {
-          setDiskItems([]);
-          setError(String(e));
-        }
-      } finally {
-        if (!cancelled) setLoading(false);
-      }
-    }
-
-    load();
-    return () => { cancelled = true; };
-  }, [projectFiles, workspacePath, fileTreeVersion]);
-
-  const items = useMemo(() => {
-    const merged = [...diskItems.filter((item) => !isSamePath(item.path, activePath)), activeItem];
-    merged.sort(sortByDateDesc);
-    return merged;
-  }, [diskItems, activeItem, activePath]);
-
-  async function openProject(path: string) {
-    if (isSamePath(path, activePath)) {
-      setPreviewMode('detail');
-      return;
-    }
-
-    await openFile(path, 'project');
-    setPreviewMode('detail');
-  }
+  const openProject = useOpenDetailByPath({
+    activePath,
+    contentType: 'project',
+    openFile,
+    setPreviewMode,
+  });
 
   return (
     <div className="max-w-4xl mx-auto px-6 py-12">
@@ -442,10 +501,7 @@ function ProjectsListPreview({ activeFile }: { activeFile: EditorFile }) {
         </p>
       </header>
 
-      {loading && <p className="text-sm text-[var(--color-gray)]">加载中...</p>}
-      {!loading && error && <p className="text-sm text-[var(--color-danger)]">加载失败：{error}</p>}
-
-      {!loading && !error && (
+      <PreviewLoadState loading={loading} error={error}>
         <>
           {items.length > 0 ? (
             <div className="grid md:grid-cols-2 gap-6">
@@ -497,7 +553,7 @@ function ProjectsListPreview({ activeFile }: { activeFile: EditorFile }) {
             <p className="text-[var(--color-gray)] text-center py-16">暂无项目，敬请期待...</p>
           )}
         </>
-      )}
+      </PreviewLoadState>
 
       <BackToTop />
     </div>
@@ -507,10 +563,6 @@ function ProjectsListPreview({ activeFile }: { activeFile: EditorFile }) {
 // ============================================
 // Diary 时间线列表预览
 // ============================================
-
-const DATE_SLUG_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
-// Supported file names: YYYY-MM-DD-HH-mm-title.md, YYYY-MM-DD-HH-mm.md, YYYY-MM-DD.md
-const DIARY_FILE_NAME_PATTERN = /^(\d{4}-\d{2}-\d{2})(?:-(\d{2})-(\d{2}))?(?:-(.+))?$/;
 
 interface DiaryEntryMeta {
   id: string;
@@ -540,22 +592,7 @@ interface DiaryDayMeta {
   openPath: string;
 }
 
-let diaryTimelineCache: { workspacePath: string; fileTreeVersion: number; days: DiaryDayMeta[] } | null = null;
-
-function titleFromSlug(value: string): string {
-  return value.replace(/[-_]+/g, ' ').trim();
-}
-
-function inferDiaryFromFileName(fileNameNoExt: string): { date: string; time: string; title: string } | null {
-  const match = fileNameNoExt.match(DIARY_FILE_NAME_PATTERN);
-  if (!match) return null;
-
-  const [, date, hour, minute, titleSlug] = match;
-  const time = hour && minute ? `${hour}:${minute}` : '';
-  const title = titleSlug ? titleFromSlug(titleSlug) : date;
-
-  return { date, time, title };
-}
+const emptyDiaryTimelineDays = (): DiaryDayMeta[] => [];
 
 function sortDiaryEntryByTimeAsc(a: DiaryEntryMeta, b: DiaryEntryMeta): number {
   if (a.time === b.time) return a.id.localeCompare(b.id);
@@ -622,94 +659,73 @@ function DiaryTimelinePreview({ activeFile }: { activeFile: EditorFile }) {
   const setSelectedYear = useEditorStore((state) => state.setDiaryTimelineYear);
   const selectedMonth = useEditorStore((state) => state.diaryTimelineMonth);
   const setSelectedMonth = useEditorStore((state) => state.setDiaryTimelineMonth);
-  const diaryFiles = useMemo(() => collectLeafFiles(fileTree, 'diary'), [fileTree]);
+  const diaryFiles = useMemo(() => collectLeafFilesByType(fileTree, 'diary'), [fileTree]);
+  const diaryRootPath = useMemo(
+    () => (workspacePath ? `${workspacePath}/content/diary` : ''),
+    [workspacePath]
+  );
 
   const activeMeta = activeFile.metadata as DiaryMetadata;
-  const activeDate = (activeMeta.date || '').trim();
+  const activeInferred = useMemo(
+    () => inferDiaryFromFileName(activeFile.name.replace(/\.md$/i, '')),
+    [activeFile.name]
+  );
+  const activeDate = resolveDiaryDate(activeMeta.date, activeInferred?.date);
 
-  const [days, setDays] = useState<DiaryDayMeta[]>([]);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const loadDiaryTimelineDays = useCallback(async (): Promise<DiaryDayMeta[]> => {
+    const entries = await Promise.all(
+      diaryFiles.map(async (node) => {
+        const baseName = node.name.replace(/\.md$/i, '');
+        const inferred = inferDiaryFromFileName(baseName);
 
-  useEffect(() => {
-    let cancelled = false;
+        const raw = await invokeTauri('read_file', { path: node.path });
+        const parsed = parseMarkdownContent(raw, 'diary');
+        const meta = parsed.metadata as DiaryMetadata;
 
-    async function load() {
-      setError(null);
-      const cache = workspacePath ? diaryTimelineCache : null;
-      if (workspacePath && cache?.workspacePath === workspacePath && cache.fileTreeVersion === fileTreeVersion) {
-        setDays(cache.days);
-        setLoading(false);
-        return;
-      }
+        const date = resolveDiaryDate(meta.date, inferred?.date);
+        if (!date) return null;
 
-      setLoading(true);
+        const title = meta.title || inferred?.title || baseName;
+        const time = meta.time || inferred?.time || '00:00';
 
-      try {
-        const entries = await Promise.all(
-          diaryFiles.map(async (node) => {
-            const baseName = node.name.replace(/\.md$/i, '');
-            const inferred = inferDiaryFromFileName(baseName);
+        return {
+          id: buildDiaryEntryId(node.path, diaryRootPath),
+          path: node.path,
+          date,
+          time,
+          title,
+          excerpt: meta.excerpt || '',
+          tags: meta.tags || [],
+          mood: meta.mood,
+          weather: meta.weather,
+          location: meta.location,
+          companions: meta.companions || [],
+        } satisfies DiaryEntryMeta;
+      })
+    );
 
-            const raw = await invokeTauri('read_file', { path: node.path });
-            const parsed = parseMarkdownContent(raw, 'diary');
-            const meta = parsed.metadata as DiaryMetadata;
+    const validEntries = entries.filter((entry): entry is DiaryEntryMeta => entry !== null);
 
-            const date = (meta.date || inferred?.date || '').trim();
-            if (!DATE_SLUG_PATTERN.test(date)) return null;
+    const grouped = new Map<string, DiaryEntryMeta[]>();
+    validEntries.forEach((entry) => {
+      const current = grouped.get(entry.date) || [];
+      current.push(entry);
+      grouped.set(entry.date, current);
+    });
 
-            const title = meta.title || inferred?.title || baseName;
-            const time = meta.time || inferred?.time || '00:00';
+    return Array.from(grouped.entries())
+      .map(([date, dayEntries]) => buildDiaryDay(date, dayEntries))
+      .sort((a, b) => (a.date > b.date ? -1 : 1));
+  }, [diaryFiles, diaryRootPath]);
 
-            return {
-              id: normalizeSlashes(node.path).replace(/.*content\/diary\//i, '').replace(/\.md$/i, ''),
-              path: node.path,
-              date,
-              time,
-              title,
-              excerpt: meta.excerpt || '',
-              tags: meta.tags || [],
-              mood: meta.mood,
-              weather: meta.weather,
-              location: meta.location,
-              companions: meta.companions || [],
-            } satisfies DiaryEntryMeta;
-          })
-        );
-
-        const validEntries = entries.filter((entry): entry is DiaryEntryMeta => entry !== null);
-
-        const grouped = new Map<string, DiaryEntryMeta[]>();
-        validEntries.forEach((entry) => {
-          const current = grouped.get(entry.date) || [];
-          current.push(entry);
-          grouped.set(entry.date, current);
-        });
-
-        const built = Array.from(grouped.entries())
-          .map(([date, dayEntries]) => buildDiaryDay(date, dayEntries))
-          .sort((a, b) => (a.date > b.date ? -1 : 1));
-
-        if (!cancelled) {
-          setDays(built);
-          if (workspacePath) {
-            diaryTimelineCache = { workspacePath, fileTreeVersion, days: built };
-          }
-        }
-      } catch (e) {
-        console.error('加载 diary 时间线失败:', e);
-        if (!cancelled) {
-          setDays([]);
-          setError(String(e));
-        }
-      } finally {
-        if (!cancelled) setLoading(false);
-      }
-    }
-
-    load();
-    return () => { cancelled = true; };
-  }, [diaryFiles, workspacePath, fileTreeVersion]);
+  const { data: days, loading, error } = useCachedPreviewData<DiaryDayMeta[]>({
+    cacheKey: 'diary-timeline',
+    workspacePath,
+    fileTreeVersion,
+    loadData: loadDiaryTimelineDays,
+    emptyValue: emptyDiaryTimelineDays,
+    errorLabel: '加载 diary 时间线',
+  });
 
   const years = useMemo(() => {
     return Array.from(new Set(days.map((day) => getYear(day.date))))
@@ -765,10 +781,7 @@ function DiaryTimelinePreview({ activeFile }: { activeFile: EditorFile }) {
         )}
       </header>
 
-      {loading && <p className="text-sm text-[var(--color-gray)]">加载中...</p>}
-      {!loading && error && <p className="text-sm text-[var(--color-danger)]">加载失败：{error}</p>}
-
-      {!loading && !error && (
+      <PreviewLoadState loading={loading} error={error}>
         <>
           {days.length > 0 ? (
             <>
@@ -870,7 +883,7 @@ function DiaryTimelinePreview({ activeFile }: { activeFile: EditorFile }) {
             </div>
           )}
         </>
-      )}
+      </PreviewLoadState>
 
       <BackToTop />
     </div>
@@ -892,12 +905,12 @@ interface GraphListItem {
   error?: string;
 }
 
-let graphsListCache: { workspacePath: string; fileTreeVersion: number; items: GraphListItem[] } | null = null;
+const emptyGraphListItems = (): GraphListItem[] => [];
 
 function GraphsListPreview({ activeFile, activeBodyContent }: { activeFile: EditorFile; activeBodyContent: string }) {
   const { fileTree, fileTreeVersion, workspacePath } = useFileStore();
   const { openFile, setPreviewMode } = useEditorStore();
-  const graphFiles = useMemo(() => collectLeafFiles(fileTree, 'graph'), [fileTree]);
+  const graphFiles = useMemo(() => collectLeafFilesByType(fileTree, 'graph'), [fileTree]);
 
   const activePath = activeFile.path;
   const activeSlug = getSlugFromName(activeFile.name);
@@ -923,85 +936,50 @@ function GraphsListPreview({ activeFile, activeBodyContent }: { activeFile: Edit
     error: activeGraphInfo.error,
   }), [activePath, activeSlug, activeMeta, activeGraphInfo]);
 
-  const [diskItems, setDiskItems] = useState<GraphListItem[]>([]);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const loadGraphItems = useCallback(async (): Promise<GraphListItem[]> => {
+    const items = await Promise.all(
+      graphFiles.map(async (node) => {
+        const raw = await invokeTauri('read_file', { path: node.path });
+        const parsed = parseMarkdownContent(raw, 'graph');
+        const meta = parsed.metadata as GraphMetadata;
+        const slug = getSlugFromName(node.name);
 
-  useEffect(() => {
-    let cancelled = false;
+        const extracted = extractGraphFromContent(parsed.content);
 
-    async function load() {
-      setError(null);
-      const cache = workspacePath ? graphsListCache : null;
-      if (workspacePath && cache?.workspacePath === workspacePath && cache.fileTreeVersion === fileTreeVersion) {
-        setDiskItems(cache.items);
-        setLoading(false);
-        return;
-      }
+        return {
+          path: node.path,
+          slug,
+          name: meta.name || slug,
+          description: meta.description || '',
+          date: meta.date || '',
+          nodeCount: extracted.graphData.nodes.length,
+          edgeCount: extracted.graphData.edges.length,
+          error: extracted.error || undefined,
+        } satisfies GraphListItem;
+      })
+    );
 
-      setLoading(true);
+    items.sort(sortByDateDesc);
+    return items;
+  }, [graphFiles]);
 
-      try {
-        const items = await Promise.all(
-          graphFiles
-            .map(async (node) => {
-              const raw = await invokeTauri('read_file', { path: node.path });
-              const parsed = parseMarkdownContent(raw, 'graph');
-              const meta = parsed.metadata as GraphMetadata;
-              const slug = getSlugFromName(node.name);
+  const { data: diskItems, loading, error } = useCachedPreviewData<GraphListItem[]>({
+    cacheKey: 'graphs-list',
+    workspacePath,
+    fileTreeVersion,
+    loadData: loadGraphItems,
+    emptyValue: emptyGraphListItems,
+    errorLabel: '加载 graphs 列表',
+  });
 
-              const extracted = extractGraphFromContent(parsed.content);
+  const items = useMergedActiveItemList(diskItems, activeItem, activePath);
 
-              return {
-                path: node.path,
-                slug,
-                name: meta.name || slug,
-                description: meta.description || '',
-                date: meta.date || '',
-                nodeCount: extracted.graphData.nodes.length,
-                edgeCount: extracted.graphData.edges.length,
-                error: extracted.error || undefined,
-              } satisfies GraphListItem;
-            })
-        );
-
-        items.sort(sortByDateDesc);
-        if (!cancelled) {
-          setDiskItems(items);
-          if (workspacePath) {
-            graphsListCache = { workspacePath, fileTreeVersion, items };
-          }
-        }
-      } catch (e) {
-        console.error('加载 graphs 列表失败:', e);
-        if (!cancelled) {
-          setDiskItems([]);
-          setError(String(e));
-        }
-      } finally {
-        if (!cancelled) setLoading(false);
-      }
-    }
-
-    load();
-    return () => { cancelled = true; };
-  }, [graphFiles, workspacePath, fileTreeVersion]);
-
-  const items = useMemo(() => {
-    const merged = [...diskItems.filter((item) => !isSamePath(item.path, activePath)), activeItem];
-    merged.sort(sortByDateDesc);
-    return merged;
-  }, [diskItems, activeItem, activePath]);
-
-  async function openGraph(path: string) {
-    if (isSamePath(path, activePath)) {
-      setPreviewMode('detail');
-      return;
-    }
-
-    await openFile(path, 'graph');
-    setPreviewMode('detail');
-  }
+  const openGraph = useOpenDetailByPath({
+    activePath,
+    contentType: 'graph',
+    openFile,
+    setPreviewMode,
+  });
 
   return (
     <div className="max-w-4xl mx-auto px-6 py-12">
@@ -1012,10 +990,7 @@ function GraphsListPreview({ activeFile, activeBodyContent }: { activeFile: Edit
         </p>
       </header>
 
-      {loading && <p className="text-sm text-[var(--color-gray)]">加载中...</p>}
-      {!loading && error && <p className="text-sm text-[var(--color-danger)]">加载失败：{error}</p>}
-
-      {!loading && !error && (
+      <PreviewLoadState loading={loading} error={error}>
         <>
           {items.length > 0 ? (
             <div className="grid md:grid-cols-2 gap-6">
@@ -1089,7 +1064,7 @@ function GraphsListPreview({ activeFile, activeBodyContent }: { activeFile: Edit
             </div>
           )}
         </>
-      )}
+      </PreviewLoadState>
 
       <BackToTop />
     </div>
@@ -1119,7 +1094,7 @@ interface RoadmapListItem {
   progress: RoadmapProgress;
 }
 
-let roadmapsListCache: { workspacePath: string; fileTreeVersion: number; items: RoadmapListItem[] } | null = null;
+const emptyRoadmapListItems = (): RoadmapListItem[] => [];
 
 const roadmapStatusConfig: Record<RoadmapStatus, { label: string; className: string }> = {
   active: { label: '进行中', className: 'bg-[var(--color-vermilion)] text-white' },
@@ -1195,7 +1170,7 @@ function RoadmapCard({
 function RoadmapsListPreview({ activeFile, activeBodyContent }: { activeFile: EditorFile; activeBodyContent: string }) {
   const { fileTree, fileTreeVersion, workspacePath } = useFileStore();
   const { openFile, setPreviewMode } = useEditorStore();
-  const roadmapFiles = useMemo(() => collectLeafFiles(fileTree, 'roadmap'), [fileTree]);
+  const roadmapFiles = useMemo(() => collectLeafFilesByType(fileTree, 'roadmap'), [fileTree]);
 
   const activePath = activeFile.path;
   const activeSlug = getSlugFromName(activeFile.name);
@@ -1216,84 +1191,49 @@ function RoadmapsListPreview({ activeFile, activeBodyContent }: { activeFile: Ed
     progress: activeProgress,
   }), [activePath, activeSlug, activeMeta, activeProgress]);
 
-  const [diskItems, setDiskItems] = useState<RoadmapListItem[]>([]);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const loadRoadmapItems = useCallback(async (): Promise<RoadmapListItem[]> => {
+    const items = await Promise.all(
+      roadmapFiles.map(async (node) => {
+        const raw = await invokeTauri('read_file', { path: node.path });
+        const parsed = parseMarkdownContent(raw, 'roadmap');
+        const meta = parsed.metadata as RoadmapMetadata;
+        const slug = getSlugFromName(node.name);
 
-  useEffect(() => {
-    let cancelled = false;
+        const { items: parsedItems } = parseRoadmapItemsFromContent(parsed.content);
 
-    async function load() {
-      setError(null);
-      const cache = workspacePath ? roadmapsListCache : null;
-      if (workspacePath && cache?.workspacePath === workspacePath && cache.fileTreeVersion === fileTreeVersion) {
-        setDiskItems(cache.items);
-        setLoading(false);
-        return;
-      }
+        return {
+          path: node.path,
+          slug,
+          name: meta.title || slug,
+          description: meta.description || '',
+          date: meta.date || '',
+          status: (meta.status || 'active') as RoadmapStatus,
+          progress: calculateProgress(parsedItems),
+        } satisfies RoadmapListItem;
+      })
+    );
 
-      setLoading(true);
+    items.sort(sortByDateDesc);
+    return items;
+  }, [roadmapFiles]);
 
-      try {
-        const items = await Promise.all(
-          roadmapFiles
-            .map(async (node) => {
-              const raw = await invokeTauri('read_file', { path: node.path });
-              const parsed = parseMarkdownContent(raw, 'roadmap');
-              const meta = parsed.metadata as RoadmapMetadata;
-              const slug = getSlugFromName(node.name);
+  const { data: diskItems, loading, error } = useCachedPreviewData<RoadmapListItem[]>({
+    cacheKey: 'roadmaps-list',
+    workspacePath,
+    fileTreeVersion,
+    loadData: loadRoadmapItems,
+    emptyValue: emptyRoadmapListItems,
+    errorLabel: '加载 roadmaps 列表',
+  });
 
-              const { items: parsedItems } = parseRoadmapItemsFromContent(parsed.content);
+  const items = useMergedActiveItemList(diskItems, activeItem, activePath);
 
-              return {
-                path: node.path,
-                slug,
-                name: meta.title || slug,
-                description: meta.description || '',
-                date: meta.date || '',
-                status: (meta.status || 'active') as RoadmapStatus,
-                progress: calculateProgress(parsedItems),
-              } satisfies RoadmapListItem;
-            })
-        );
-
-        items.sort(sortByDateDesc);
-        if (!cancelled) {
-          setDiskItems(items);
-          if (workspacePath) {
-            roadmapsListCache = { workspacePath, fileTreeVersion, items };
-          }
-        }
-      } catch (e) {
-        console.error('加载 roadmaps 列表失败:', e);
-        if (!cancelled) {
-          setDiskItems([]);
-          setError(String(e));
-        }
-      } finally {
-        if (!cancelled) setLoading(false);
-      }
-    }
-
-    load();
-    return () => { cancelled = true; };
-  }, [roadmapFiles, workspacePath, fileTreeVersion]);
-
-  const items = useMemo(() => {
-    const merged = [...diskItems.filter((item) => !isSamePath(item.path, activePath)), activeItem];
-    merged.sort(sortByDateDesc);
-    return merged;
-  }, [diskItems, activeItem, activePath]);
-
-  async function openRoadmap(path: string) {
-    if (isSamePath(path, activePath)) {
-      setPreviewMode('detail');
-      return;
-    }
-
-    await openFile(path, 'roadmap');
-    setPreviewMode('detail');
-  }
+  const openRoadmap = useOpenDetailByPath({
+    activePath,
+    contentType: 'roadmap',
+    openFile,
+    setPreviewMode,
+  });
 
   const activeRoadmaps = items.filter((r) => r.status === 'active');
   const pausedRoadmaps = items.filter((r) => r.status === 'paused');
@@ -1308,10 +1248,7 @@ function RoadmapsListPreview({ activeFile, activeBodyContent }: { activeFile: Ed
         </p>
       </header>
 
-      {loading && <p className="text-sm text-[var(--color-gray)]">加载中...</p>}
-      {!loading && error && <p className="text-sm text-[var(--color-danger)]">加载失败：{error}</p>}
-
-      {!loading && !error && (
+      <PreviewLoadState loading={loading} error={error}>
         <>
           {activeRoadmaps.length > 0 && (
             <section className="mb-12">
@@ -1379,7 +1316,7 @@ function RoadmapsListPreview({ activeFile, activeBodyContent }: { activeFile: Ed
             </div>
           )}
         </>
-      )}
+      </PreviewLoadState>
 
       <BackToTop />
     </div>

@@ -1,8 +1,12 @@
+import { lazy, Suspense } from 'react';
 import type { GraphMetadata } from '@/types';
 import { extractGraphFromContent } from '@/services/contentParser';
-import { GraphViewer } from '@/components/graph';
-import { useEditorStore } from '@/store';
 import { MarkdownRenderer } from '../MarkdownRenderer';
+import { PreviewBackButton } from '../PreviewBackButton';
+import { PreviewDescription, PreviewDate } from '../PreviewMeta';
+
+// @xyflow/react 很大，仅在图谱预览时才加载
+const LazyGraphViewer = lazy(() => import('@/components/graph/GraphViewer'));
 
 interface GraphPreviewProps {
   metadata: GraphMetadata;
@@ -12,39 +16,21 @@ interface GraphPreviewProps {
 
 // 知识图谱预览（与 JasBlog graphs/[slug]/page.tsx 一致）
 export function GraphPreview({ metadata, content, embedded = false }: GraphPreviewProps) {
-  const setPreviewMode = useEditorStore((state) => state.setPreviewMode);
   // 从正文内容中提取图谱数据
   const { graphData, remainingContent, error } = extractGraphFromContent(content);
 
   return (
     <div className="max-w-6xl mx-auto px-6 py-12">
       {!embedded && (
-        <button
-          type="button"
-          onClick={() => setPreviewMode('list')}
-          className="inline-flex items-center gap-1 text-[var(--color-gray)] hover:text-[var(--color-vermilion)] mb-6 transition-colors"
-        >
-          <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
-            <path
-              d="M10 12L6 8L10 4"
-              stroke="currentColor"
-              strokeWidth="1.5"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            />
-          </svg>
-          返回图谱列表
-        </button>
+        <PreviewBackButton label="返回图谱列表" />
       )}
 
       {/* 标题 */}
       <header className="mb-8">
         <h1 className="text-2xl font-bold mb-2">{metadata.name}</h1>
-        {metadata.description && (
-          <p className="text-[var(--color-gray)] mb-2">{metadata.description}</p>
-        )}
+        <PreviewDescription text={metadata.description} className="text-[var(--color-gray)] mb-2" />
         <p className="text-sm text-[var(--color-gray)]">
-          {metadata.date && <span className="mr-4">{metadata.date}</span>}
+          <PreviewDate date={metadata.date} className="mr-4" />
           <span>{graphData.nodes.length} 个节点</span>
           <span className="mx-2">·</span>
           <span>{graphData.edges.length} 条连接</span>
@@ -70,7 +56,11 @@ export function GraphPreview({ metadata, content, embedded = false }: GraphPrevi
       )}
 
       {/* 图谱查看器 */}
-      {!error && <GraphViewer data={graphData} />}
+      {!error && (
+        <Suspense fallback={<div className="flex items-center justify-center py-10 text-[var(--color-text-muted)]">加载图谱中...</div>}>
+          <LazyGraphViewer data={graphData} />
+        </Suspense>
+      )}
 
       {/* 正文内容 */}
       {remainingContent.trim() && (

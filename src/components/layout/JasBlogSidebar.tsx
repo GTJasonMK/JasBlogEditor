@@ -58,7 +58,7 @@ export function JasBlogSidebar() {
 
   const handleRename = () => {
     if (!contextMenu.file) return;
-    const name = contextMenu.file.name.replace(/\.(md|json)$/, '');
+    const name = contextMenu.file.name.replace(/\.(md|json)$/i, '');
     setRenameDialog({ visible: true, file: contextMenu.file, newName: name });
     setContextMenu(prev => ({ ...prev, visible: false }));
   };
@@ -88,7 +88,7 @@ export function JasBlogSidebar() {
     if (!renameDialog.file || !renameDialog.newName.trim()) return;
 
     const oldPath = renameDialog.file.path;
-    const ext = renameDialog.file.name.match(/\.(md|json)$/)?.[0] || '.md';
+    const ext = renameDialog.file.name.match(/\.(md|json)$/i)?.[0] || '.md';
     const newPath = renameSiblingPath(oldPath, renameDialog.newName, ext);
 
     try {

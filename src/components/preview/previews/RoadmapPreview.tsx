@@ -1,7 +1,8 @@
 import type { RoadmapMetadata, RoadmapItem } from '@/types';
 import { parseRoadmapItemsFromContent } from '@/services/contentParser';
-import { useEditorStore } from '@/store';
 import { MarkdownRenderer } from '../MarkdownRenderer';
+import { PreviewBackButton } from '../PreviewBackButton';
+import { PreviewDescription } from '../PreviewMeta';
 
 interface RoadmapPreviewProps {
   metadata: RoadmapMetadata;
@@ -84,9 +85,36 @@ function RoadmapItemCard({ item }: { item: RoadmapItem }) {
   );
 }
 
+function RoadmapItemGroup({
+  title,
+  count,
+  dotClassName,
+  items,
+}: {
+  title: string;
+  count: number;
+  dotClassName: string;
+  items: RoadmapItem[];
+}) {
+  if (items.length === 0) return null;
+
+  return (
+    <section className="mb-10">
+      <h3 className="text-lg font-medium mb-4 flex items-center gap-2 text-[var(--color-text)]">
+        <span className={`w-3 h-3 rounded-full ${dotClassName}`} />
+        {title} ({count})
+      </h3>
+      <div className="grid gap-3">
+        {items.map((item) => (
+          <RoadmapItemCard key={item.id} item={item} />
+        ))}
+      </div>
+    </section>
+  );
+}
+
 // 规划预览（与 JasBlog roadmap/[slug]/page.tsx 一致）
 export function RoadmapPreview({ metadata, content, embedded = false }: RoadmapPreviewProps) {
-  const setPreviewMode = useEditorStore((state) => state.setPreviewMode);
   // 从正文内容解析任务列表和剩余内容
   const { items, remainingContent } = parseRoadmapItemsFromContent(content);
 
@@ -104,22 +132,7 @@ export function RoadmapPreview({ metadata, content, embedded = false }: RoadmapP
   return (
     <div className="max-w-4xl mx-auto px-6 py-12">
       {!embedded && (
-        <button
-          type="button"
-          onClick={() => setPreviewMode('list')}
-          className="inline-flex items-center gap-1 text-[var(--color-gray)] hover:text-[var(--color-vermilion)] mb-6 transition-colors"
-        >
-          <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
-            <path
-              d="M10 12L6 8L10 4"
-              stroke="currentColor"
-              strokeWidth="1.5"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            />
-          </svg>
-          返回规划列表
-        </button>
+        <PreviewBackButton label="返回规划列表" />
       )}
 
       {/* 标题区域 */}
@@ -130,7 +143,7 @@ export function RoadmapPreview({ metadata, content, embedded = false }: RoadmapP
             {roadmapStatusCfg.label}
           </span>
         </div>
-        <p className="text-[var(--color-gray)] mb-4">{metadata.description}</p>
+        <PreviewDescription text={metadata.description} className="text-[var(--color-gray)] mb-4" />
 
         {/* 进度条 */}
         {total > 0 && (
@@ -167,51 +180,24 @@ export function RoadmapPreview({ metadata, content, embedded = false }: RoadmapP
             <span className="w-3 h-3 rounded-full bg-[var(--color-vermilion)]" />
             任务列表 ({items.length})
           </h2>
-
-          {/* 任务列表 - 进行中 */}
-          {inProgress.length > 0 && (
-            <section className="mb-10">
-              <h3 className="text-lg font-medium mb-4 flex items-center gap-2 text-[var(--color-text)]">
-                <span className="w-3 h-3 rounded-full bg-[var(--color-vermilion)]" />
-                正在进行 ({inProgress.length})
-              </h3>
-              <div className="grid gap-3">
-                {inProgress.map((item) => (
-                  <RoadmapItemCard key={item.id} item={item} />
-                ))}
-              </div>
-            </section>
-          )}
-
-          {/* 任务列表 - 待开始 */}
-          {todo.length > 0 && (
-            <section className="mb-10">
-              <h3 className="text-lg font-medium mb-4 flex items-center gap-2 text-[var(--color-text)]">
-                <span className="w-3 h-3 rounded-full bg-gray-300" />
-                计划中 ({todo.length})
-              </h3>
-              <div className="grid gap-3">
-                {todo.map((item) => (
-                  <RoadmapItemCard key={item.id} item={item} />
-                ))}
-              </div>
-            </section>
-          )}
-
-          {/* 任务列表 - 已完成 */}
-          {done.length > 0 && (
-            <section>
-              <h3 className="text-lg font-medium mb-4 flex items-center gap-2 text-[var(--color-text)]">
-                <span className="w-3 h-3 rounded-full bg-green-500" />
-                已完成 ({done.length})
-              </h3>
-              <div className="grid gap-3">
-                {done.map((item) => (
-                  <RoadmapItemCard key={item.id} item={item} />
-                ))}
-              </div>
-            </section>
-          )}
+          <RoadmapItemGroup
+            title="正在进行"
+            count={inProgress.length}
+            dotClassName="bg-[var(--color-vermilion)]"
+            items={inProgress}
+          />
+          <RoadmapItemGroup
+            title="计划中"
+            count={todo.length}
+            dotClassName="bg-gray-300"
+            items={todo}
+          />
+          <RoadmapItemGroup
+            title="已完成"
+            count={done.length}
+            dotClassName="bg-green-500"
+            items={done}
+          />
         </section>
       )}
 

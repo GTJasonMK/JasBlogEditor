@@ -1,12 +1,16 @@
-import { useEffect, useState } from 'react';
-import { GraphViewer } from '@/components/graph';
+import { lazy, Suspense, useEffect, useState } from 'react';
 import type { GraphData, NoteMetadata } from '@/types';
 import { useEditorStore } from '@/store';
+
+// @xyflow/react 很大，仅在笔记内容包含 ```graph 块时才加载
+const LazyGraphViewer = lazy(() => import('@/components/graph/GraphViewer'));
 import { MarkdownRenderer } from '../MarkdownRenderer';
 import { TableOfContents } from '../TableOfContents';
 import { BackToTop } from '../BackToTop';
 import { usePreviewScrollContainer } from '../PreviewScrollContext';
 import { Comments } from '../Comments';
+import { PreviewBackButton } from '../PreviewBackButton';
+import { PreviewDate, PreviewTagList } from '../PreviewMeta';
 
 interface NotePreviewProps {
   fileName: string;
@@ -19,11 +23,10 @@ type ContentSegment =
   | { type: 'markdown'; content: string }
   | { type: 'graph'; data: GraphData };
 
-function preprocessAlerts(content: string): string {
-  return content.replace(
-    /^(>\s*)\[!(NOTE|TIP|IMPORTANT|WARNING|CAUTION)\]\r?\n?/gm,
-    '$1ALERTBOX$2ALERTBOX\n',
-  );
+function isValidGraphData(value: unknown): value is GraphData {
+  if (!value || typeof value !== 'object') return false;
+  const obj = value as Record<string, unknown>;
+  return Array.isArray(obj.nodes) && Array.isArray(obj.edges);
 }
 
 function parseContent(content: string): ContentSegment[] {
@@ -44,8 +47,15 @@ function parseContent(content: string): ContentSegment[] {
 
     try {
       const graphJson = match[1].trim();
-      const graphData = JSON.parse(graphJson) as GraphData;
-      segments.push({ type: 'graph', data: graphData });
+      const parsed = JSON.parse(graphJson) as unknown;
+      if (isValidGraphData(parsed)) {
+        segments.push({ type: 'graph', data: parsed });
+      } else {
+        segments.push({
+          type: 'markdown',
+          content: '```json\n' + match[1] + '```',
+        });
+      }
     } catch {
       segments.push({
         type: 'markdown',
@@ -100,8 +110,7 @@ function hasVisibleTocHeadings(content: string): boolean {
 export function NotePreview({ fileName, metadata, content, embedded = false }: NotePreviewProps) {
   const setPreviewMode = useEditorStore((state) => state.setPreviewMode);
   const setNotesListTag = useEditorStore((state) => state.setNotesListTag);
-  const processedContent = preprocessAlerts(content);
-  const segments = parseContent(processedContent);
+  const segments = parseContent(content);
 
   const scrollContainer = usePreviewScrollContainer();
   const [canShowToc, setCanShowToc] = useState(false);
@@ -131,53 +140,33 @@ export function NotePreview({ fileName, metadata, content, embedded = false }: N
     };
   }, [scrollContainer]);
 
-  const hasTocCandidates = hasVisibleTocHeadings(processedContent);
+  const hasTocCandidates = hasVisibleTocHeadings(content);
   const showToc = canShowToc && hasTocCandidates;
 
   const slug = fileName.replace(/\.md$/i, '');
   const commentTerm = `/notes/${slug}`;
+  const handleTagClick = (tag: string) => {
+    setNotesListTag(tag);
+    setPreviewMode('list');
+  };
 
   return (
     <div className="max-w-6xl mx-auto px-6 py-12">
       {!embedded && (
-        <button
-          type="button"
-          onClick={() => setPreviewMode('list')}
-          className="text-sm text-[var(--color-gray)] hover:text-[var(--color-vermilion)] mb-8 inline-block"
-        >
-          &larr; 返回笔记列表
-        </button>
+        <PreviewBackButton label="返回笔记列表" className="mb-8" />
       )}
 
       <div className="flex gap-10 items-start">
         <div className="min-w-0 flex-1 max-w-3xl">
           {/* 文章头部 */}
           <header className="mb-8">
-            <time className="text-sm text-[var(--color-gray)]">{metadata.date}</time>
+            <PreviewDate date={metadata.date} />
             <h1 className="text-3xl font-bold mt-2 mb-4">{metadata.title}</h1>
-            {metadata.tags && metadata.tags.length > 0 && (
-              <div className="flex gap-2 flex-wrap">
-                {metadata.tags.map((tag) => (
-                  embedded ? (
-                    <span key={tag} className="tag">
-                      {tag}
-                    </span>
-                  ) : (
-                    <button
-                      key={tag}
-                      type="button"
-                      onClick={() => {
-                        setNotesListTag(tag);
-                        setPreviewMode('list');
-                      }}
-                      className="tag hover:bg-[var(--color-vermilion)] hover:text-white"
-                    >
-                      {tag}
-                    </button>
-                  )
-                ))}
-              </div>
-            )}
+            <PreviewTagList
+              tags={metadata.tags}
+              onTagClick={embedded ? undefined : handleTagClick}
+              buttonClassName="tag hover:bg-[var(--color-vermilion)] hover:text-white"
+            />
           </header>
 
           <div className="divider-cloud mb-8" />
@@ -191,7 +180,9 @@ export function NotePreview({ fileName, metadata, content, embedded = false }: N
 
               return (
                 <div key={index} className="my-8 not-prose">
-                  <GraphViewer data={segment.data} />
+                  <Suspense fallback={<div className="flex items-center justify-center py-10 text-[var(--color-text-muted)]">加载图谱中...</div>}>
+                    <LazyGraphViewer data={segment.data} />
+                  </Suspense>
                 </div>
               );
             })}
@@ -210,7 +201,7 @@ export function NotePreview({ fileName, metadata, content, embedded = false }: N
         {/* 右侧目录（只在主预览区启用） */}
         {showToc && (
           <div className="hidden lg:block w-56 flex-shrink-0">
-            <TableOfContents content={processedContent} />
+            <TableOfContents content={content} />
           </div>
         )}
       </div>

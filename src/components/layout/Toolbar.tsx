@@ -1,5 +1,5 @@
-import { useState, useEffect } from 'react';
-import { useSettingsStore, useFileStore, useEditorStore, useWindowStore } from '@/store';
+import { useState, useEffect, lazy, Suspense } from 'react';
+import { useSettingsStore, useFileStore, useEditorStore, useWindowStore, useTemplateStore } from '@/store';
 import { openFolderDialog } from '@/platform/tauri';
 import { confirmDialog } from '@/utils/confirmDialog';
 import { applyTheme, getEffectiveTheme } from '@/utils';
@@ -10,8 +10,13 @@ import { ThemeMenu } from './toolbar/ThemeMenu';
 import { ViewModeToggle } from './toolbar/ViewModeToggle';
 import { PreviewModeToggle } from './toolbar/PreviewModeToggle';
 import { ErrorToast } from './toolbar/ErrorToast';
-import { HelpModal } from './toolbar/HelpModal';
 import { JasBlogSearchModal } from './toolbar/JasBlogSearchModal';
+import { SaveAsTemplateDialog } from './toolbar/SaveAsTemplateDialog';
+
+// HelpModal 内部导入全部预览组件 + MarkdownRenderer + mermaid 等重型依赖，仅在用户打开帮助时才加载
+const LazyHelpModal = lazy(() =>
+  import('./toolbar/HelpModal').then(m => ({ default: m.HelpModal }))
+);
 
 export function Toolbar() {
   const {
@@ -39,15 +44,17 @@ export function Toolbar() {
     deleteFile,
   } = useEditorStore();
   const { toggleMiniMode, error: windowError, clearError: clearWindowError } = useWindowStore();
+  const { saveAsTemplate, error: templateError, clearError: clearTemplateError } = useTemplateStore();
   const [localError, setLocalError] = useState<string | null>(null);
   const [helpOpen, setHelpOpen] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
+  const [saveTemplateOpen, setSaveTemplateOpen] = useState(false);
 
   const currentTheme = settings.theme || 'system';
   const effectiveTheme = getEffectiveTheme(currentTheme);
 
   // 合并错误信息
-  const displayError = localError || editorError || windowError || settingsError;
+  const displayError = localError || editorError || windowError || settingsError || templateError;
 
   // 自动清除错误（5秒后）
   useEffect(() => {
@@ -57,10 +64,11 @@ export function Toolbar() {
         clearEditorError();
         clearWindowError();
         clearSettingsError();
+        clearTemplateError();
       }, 5000);
       return () => clearTimeout(timer);
     }
-  }, [displayError, clearEditorError, clearWindowError, clearSettingsError]);
+  }, [displayError, clearEditorError, clearWindowError, clearSettingsError, clearTemplateError]);
 
   const isEditableTarget = (target: EventTarget | null) => {
     if (!target || !(target instanceof HTMLElement)) return false;
@@ -125,13 +133,13 @@ export function Toolbar() {
     }
   };
 
-  const handleCreateJasblogFile = async (type: JasBlogContentType, filename: string) => {
+  const handleCreateJasblogFile = async (type: JasBlogContentType, filename: string, content: string) => {
     if (!workspacePath) return;
     try {
-      const path = await createNewFile(workspacePath, type, filename);
+      const path = await createNewFile(workspacePath, type, filename, content);
       await openFile(path, type);
       await refreshFileTree();
-    } catch (error) {
+    } catch {
       // 错误已在 store 中处理
     }
   };
@@ -181,6 +189,7 @@ export function Toolbar() {
     clearEditorError();
     clearWindowError();
     clearSettingsError();
+    clearTemplateError();
   };
 
   const handleSetTheme = async (theme: ThemeMode) => {
@@ -236,6 +245,20 @@ export function Toolbar() {
           </svg>
           删除
         </button>
+
+        {/* 另存为模板按钮（仅 JasBlog 模式且有当前文件时可用） */}
+        {workspaceType === 'jasblog' && currentFile && currentFile.type !== 'doc' && (
+          <button
+            onClick={() => setSaveTemplateOpen(true)}
+            className="flex items-center gap-1 px-3 py-1.5 text-sm text-[var(--color-text-muted)] hover:bg-[var(--color-surface)] rounded-md transition-colors"
+            title="另存为模板"
+          >
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 5a1 1 0 011-1h14a1 1 0 011 1v2a1 1 0 01-1 1H5a1 1 0 01-1-1V5zM4 13a1 1 0 011-1h6a1 1 0 011 1v6a1 1 0 01-1 1H5a1 1 0 01-1-1v-6zM16 13a1 1 0 011-1h2a1 1 0 011 1v6a1 1 0 01-1 1h-2a1 1 0 01-1-1v-6z" />
+            </svg>
+            存为模板
+          </button>
+        )}
 
         {/* 右侧分隔 */}
         <div className="flex-1" />
@@ -304,9 +327,30 @@ export function Toolbar() {
         <ErrorToast message={displayError} onDismiss={handleDismissError} />
       )}
 
-      <HelpModal open={helpOpen} onClose={() => setHelpOpen(false)} />
+      {helpOpen && (
+        <Suspense fallback={null}>
+          <LazyHelpModal open={helpOpen} onClose={() => setHelpOpen(false)} />
+        </Suspense>
+      )}
 
       <JasBlogSearchModal open={searchOpen} onClose={() => setSearchOpen(false)} />
+
+      {/* 另存为模板对话框 */}
+      {saveTemplateOpen && currentFile && currentFile.type !== 'doc' && (
+        <SaveAsTemplateDialog
+          type={currentFile.type as JasBlogContentType}
+          defaultName={currentFile.name.replace(/\.md$/i, '')}
+          onConfirm={async (name, description) => {
+            // 从当前文件提取完整内容（frontmatter + body）
+            const content = currentFile.frontmatterBlock
+              ? `${currentFile.frontmatterBlock}${currentFile.content}`
+              : currentFile.content;
+            await saveAsTemplate(name, description || undefined, currentFile.type as JasBlogContentType, content);
+            setSaveTemplateOpen(false);
+          }}
+          onCancel={() => setSaveTemplateOpen(false)}
+        />
+      )}
     </>
   );
 }

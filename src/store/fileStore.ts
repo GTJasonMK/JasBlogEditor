@@ -132,7 +132,7 @@ async function loadDocsFileTree(dirPath: string, depth = 0): Promise<FileTreeNod
           children,
         });
       }
-    } else if (file.name.endsWith('.md')) {
+    } else if (file.name.toLowerCase().endsWith('.md')) {
       // 只处理 .md 文件
       nodes.push({
         name: file.name,

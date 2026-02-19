@@ -29,3 +29,14 @@ export interface RustSettings {
   theme?: string | null;
 }
 
+// Rust 用户模板结构（与 src-tauri/src/lib.rs UserTemplate 保持一致）
+export interface RustUserTemplate {
+  id: string;
+  name: string;
+  description?: string;
+  template_type: string;
+  content: string;
+  created_at: string;
+  updated_at: string;
+}
+

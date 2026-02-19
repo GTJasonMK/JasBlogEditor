@@ -1,5 +1,15 @@
 import { useEffect, useRef, useState } from "react";
-import mermaid from "mermaid";
+import type MermaidAPI from "mermaid";
+
+// 模块级缓存：mermaid 仅在首次渲染 mermaid 代码块时动态加载
+let mermaidInstance: typeof MermaidAPI | null = null;
+async function loadMermaid() {
+  if (!mermaidInstance) {
+    const mod = await import("mermaid");
+    mermaidInstance = mod.default;
+  }
+  return mermaidInstance;
+}
 
 // 浅色主题配置
 const lightThemeVariables = {
@@ -24,7 +34,7 @@ const darkThemeVariables = {
 };
 
 // 初始化 mermaid（使用函数，根据主题动态配置）
-function initMermaid(isDark: boolean) {
+function initMermaid(mermaid: typeof MermaidAPI, isDark: boolean) {
   mermaid.initialize({
     startOnLoad: false,
     theme: "base",
@@ -88,8 +98,9 @@ export function MermaidDiagram({ code }: MermaidDiagramProps) {
       if (!code.trim()) return;
 
       try {
+        const mermaid = await loadMermaid();
         // 根据当前主题初始化 mermaid
-        initMermaid(currentTheme);
+        initMermaid(mermaid, currentTheme);
 
         // 生成唯一 ID
         const id = `mermaid-${Math.random().toString(36).substr(2, 9)}`;

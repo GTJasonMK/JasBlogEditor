@@ -1,11 +1,18 @@
 import { create } from 'zustand';
 import { invokeTauri } from '@/platform/tauri';
+import { inferDiaryFromFileName } from '@/services/diary';
 import {
   parseMarkdownContent,
   serializeDocContentPreservingFrontmatter,
   serializeMarkdownContentPreservingFrontmatter,
 } from '@/services/contentParser';
-import { buildDocFilePath, buildJasblogFilePath, createNewDocMarkdown, createNewJasblogMarkdown } from '@/services/contentTemplates';
+import {
+  buildDocFilePath,
+  buildDocFolderPath,
+  buildJasblogFilePath,
+  createNewDocMarkdown,
+  createNewJasblogMarkdown,
+} from '@/services/contentTemplates';
 import type { ContentType, EditorFile, NoteMetadata, ProjectMetadata, DiaryMetadata, RoadmapMetadata, GraphMetadata, DocMetadata, JasBlogContentType } from '@/types';
 
 type Metadata = NoteMetadata | ProjectMetadata | DiaryMetadata | RoadmapMetadata | GraphMetadata | DocMetadata;
@@ -13,8 +20,12 @@ type Metadata = NoteMetadata | ProjectMetadata | DiaryMetadata | RoadmapMetadata
 export type EditorViewMode = 'edit' | 'preview' | 'split';
 export type PreviewMode = 'detail' | 'list';
 
-function titleFromSlug(value: string): string {
-  return value.replace(/[-_]+/g, ' ').trim();
+function getLocalDateString(): string {
+  const now = new Date();
+  const year = now.getFullYear();
+  const month = String(now.getMonth() + 1).padStart(2, '0');
+  const day = String(now.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -50,19 +61,6 @@ function deepEqual(a: unknown, b: unknown): boolean {
   return false;
 }
 
-function inferDiaryFromFileName(fileNameNoExt: string): Pick<DiaryMetadata, 'date' | 'time' | 'title'> | null {
-  // 支持：YYYY-MM-DD-HH-mm-title.md、YYYY-MM-DD-HH-mm.md、YYYY-MM-DD.md（与 JasBlog src/lib/diary.ts 一致）
-  const fileNamePattern = /^(\d{4}-\d{2}-\d{2})(?:-(\d{2})-(\d{2}))?(?:-(.+))?$/;
-  const match = fileNameNoExt.match(fileNamePattern);
-  if (!match) return null;
-
-  const [, date, hour, minute, titleSlug] = match;
-  const time = hour && minute ? `${hour}:${minute}` : '';
-  const title = titleSlug ? titleFromSlug(titleSlug) : date;
-
-  return { date, time, title };
-}
-
 interface EditorState {
   currentFile: EditorFile | null;
   isLoading: boolean;
@@ -80,7 +78,7 @@ interface EditorState {
   updateContent: (content: string) => void;
   updateMetadata: (metadata: Partial<Metadata>) => void;
   saveFile: () => Promise<void>;
-  createNewFile: (workspacePath: string, type: JasBlogContentType, filename: string) => Promise<string>;
+  createNewFile: (workspacePath: string, type: JasBlogContentType, filename: string, templateContent?: string) => Promise<string>;
   createDocFile: (workspacePath: string, relativePath: string) => Promise<string>;
   createFolder: (workspacePath: string, relativePath: string) => Promise<void>;
   deleteCurrentFile: () => Promise<void>;
@@ -118,14 +116,24 @@ export const useEditorStore = create<EditorState>((set, get) => ({
 
       if (type === 'diary') {
         const inferred = inferDiaryFromFileName(name.replace(/\.md$/i, ''));
-        const today = new Date().toISOString().split('T')[0];
+        const today = getLocalDateString();
 
         const diary = metadata as DiaryMetadata;
+        // 无 frontmatter 时，parseMarkdownContent 会给 diary 提供默认 date/time；
+        // 这里优先使用文件名推断，避免把“今天/00:00”错误写回历史日记文件。
+        const preferInferred = !parsed.hasFrontmatter;
+        const resolvedDate = preferInferred
+          ? (inferred?.date || diary.date || today)
+          : (diary.date || inferred?.date || today);
+        const resolvedTime = preferInferred
+          ? (inferred?.time || diary.time || '00:00')
+          : (diary.time || inferred?.time || '00:00');
+
         metadata = {
           ...diary,
           title: diary.title || inferred?.title || name.replace(/\.md$/i, ''),
-          date: diary.date || inferred?.date || today,
-          time: diary.time || inferred?.time || '00:00',
+          date: resolvedDate,
+          time: resolvedTime,
           tags: diary.tags || [],
           companions: diary.companions || [],
         };
@@ -268,13 +276,14 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     }
   },
 
-  createNewFile: async (workspacePath, type, filename) => {
+  createNewFile: async (workspacePath, type, filename, templateContent) => {
     set({ isLoading: true, error: null });
 
     try {
       const path = buildJasblogFilePath(workspacePath, type, filename);
+      // 优先使用传入的模板内容，否则使用默认生成
+      let content = templateContent ?? createNewJasblogMarkdown(type, filename);
       // JasBlog content 目录在 Windows 环境中常见 CRLF + BOM；新建时尽量保持风格一致
-      let content = createNewJasblogMarkdown(type, filename);
       content = content.replace(/\r\n/g, '\n').replace(/\n/g, '\r\n');
       content = `\uFEFF${content}`;
       await invokeTauri('create_file', { path, content });
@@ -308,7 +317,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     set({ isLoading: true, error: null });
 
     try {
-      const path = `${workspacePath}/${relativePath}`;
+      const path = buildDocFolderPath(workspacePath, relativePath);
       await invokeTauri('create_directory', { path });
       set({ isLoading: false });
     } catch (error) {

@@ -23,6 +23,18 @@ pub struct MiniModeSettings {
     pub position_y: Option<f64>,
 }
 
+// 用户模板结构体
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct UserTemplate {
+    pub id: String,
+    pub name: String,
+    pub description: Option<String>,
+    pub template_type: String,
+    pub content: String,
+    pub created_at: String,
+    pub updated_at: String,
+}
+
 // 设置结构体
 #[derive(Debug, Serialize, Deserialize, Default)]
 pub struct Settings {
@@ -31,6 +43,18 @@ pub struct Settings {
     pub last_opened_file: Option<String>,
     pub mini_mode_settings: Option<MiniModeSettings>,
     pub theme: Option<String>,  // "light" | "dark" | "system"
+}
+
+// 获取模板文件路径
+fn get_templates_path() -> Result<PathBuf, String> {
+    let app_dir = dirs_next::data_dir()
+        .ok_or("无法获取应用数据目录".to_string())?
+        .join("JasBlogEditor");
+
+    fs::create_dir_all(&app_dir)
+        .map_err(|e| format!("创建目录失败: {}", e))?;
+
+    Ok(app_dir.join("templates.json"))
 }
 
 // 获取设置文件路径
@@ -177,6 +201,34 @@ fn save_settings(settings: Settings) -> Result<(), String> {
         .map_err(|e| format!("保存设置失败: {}", e))
 }
 
+// 获取用户模板
+#[tauri::command]
+fn get_templates() -> Result<Vec<UserTemplate>, String> {
+    let path = get_templates_path()?;
+
+    if !path.exists() {
+        return Ok(vec![]);
+    }
+
+    let content = fs::read_to_string(&path)
+        .map_err(|e| format!("读取模板失败: {}", e))?;
+
+    serde_json::from_str(&content)
+        .map_err(|e| format!("解析模板失败: {}", e))
+}
+
+// 保存用户模板
+#[tauri::command]
+fn save_templates(templates: Vec<UserTemplate>) -> Result<(), String> {
+    let path = get_templates_path()?;
+
+    let content = serde_json::to_string_pretty(&templates)
+        .map_err(|e| format!("序列化模板失败: {}", e))?;
+
+    fs::write(&path, &content)
+        .map_err(|e| format!("保存模板失败: {}", e))
+}
+
 pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
@@ -193,7 +245,9 @@ pub fn run() {
             create_directory,
             path_exists,
             get_settings,
-            save_settings
+            save_settings,
+            get_templates,
+            save_templates
         ])
         .setup(|app| {
             // 在 Windows 上启用 WebView2 的 pinch zoom

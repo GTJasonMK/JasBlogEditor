@@ -1,11 +1,12 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { CONTENT_TYPE_LABELS, JASBLOG_CONTENT_TYPES } from '@/types';
 import type { JasBlogContentType, WorkspaceType } from '@/types';
+import { TemplatePickerDialog } from './TemplatePickerDialog';
 
 interface NewMenuProps {
   disabled: boolean;
   workspaceType: WorkspaceType | null;
-  onCreateJasblogFile: (type: JasBlogContentType, filename: string) => Promise<void>;
+  onCreateJasblogFile: (type: JasBlogContentType, filename: string, content: string) => Promise<void>;
   onCreateDoc: (relativePath: string) => Promise<void>;
   onCreateFolder: (relativePath: string) => Promise<void>;
 }
@@ -16,6 +17,31 @@ export function NewMenu({ disabled, workspaceType, onCreateJasblogFile, onCreate
   const [docDialogOpen, setDocDialogOpen] = useState(false);
   const [folderDialogOpen, setFolderDialogOpen] = useState(false);
   const [input, setInput] = useState('');
+  const menuRef = useRef<HTMLDivElement | null>(null);
+
+  useEffect(() => {
+    if (!menuOpen) return;
+
+    const handleClickOutside = (event: MouseEvent) => {
+      const target = event.target as Node | null;
+      if (menuRef.current && target && !menuRef.current.contains(target)) {
+        setMenuOpen(false);
+      }
+    };
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        setMenuOpen(false);
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    window.addEventListener('keydown', handleKeyDown);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+      window.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [menuOpen]);
 
   const closeAllDialogs = () => {
     setJasblogDialogType(null);
@@ -27,7 +53,6 @@ export function NewMenu({ disabled, workspaceType, onCreateJasblogFile, onCreate
   const handleNewFile = (type: JasBlogContentType) => {
     setMenuOpen(false);
     setJasblogDialogType(type);
-    setInput('');
   };
 
   const handleNewDoc = () => {
@@ -42,21 +67,13 @@ export function NewMenu({ disabled, workspaceType, onCreateJasblogFile, onCreate
     setInput('');
   };
 
-  const handleCreateJasblog = async () => {
-    if (!jasblogDialogType || !input.trim()) return;
-    try {
-      await onCreateJasblogFile(jasblogDialogType, input.trim());
-    } finally {
-      closeAllDialogs();
-    }
-  };
-
   const handleCreateDoc = async () => {
     if (!input.trim()) return;
     try {
       await onCreateDoc(input.trim());
-    } finally {
       closeAllDialogs();
+    } catch {
+      // 错误由上层 store/Toolbar 统一处理；保留输入以便用户修改后重试
     }
   };
 
@@ -64,109 +81,81 @@ export function NewMenu({ disabled, workspaceType, onCreateJasblogFile, onCreate
     if (!input.trim()) return;
     try {
       await onCreateFolder(input.trim());
-    } finally {
       closeAllDialogs();
+    } catch {
+      // 错误由上层 store/Toolbar 统一处理；保留输入以便用户修改后重试
     }
   };
 
   return (
     <>
       <div className="relative">
-        <button
-          onClick={() => setMenuOpen(!menuOpen)}
-          disabled={disabled}
-          className="flex items-center gap-1 px-3 py-1.5 text-sm bg-[var(--color-primary)] text-white hover:bg-[var(--color-primary-dark)] disabled:opacity-50 disabled:cursor-not-allowed rounded-md transition-colors"
-        >
-          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-          </svg>
-          新建
-          <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-          </svg>
-        </button>
+        <div ref={menuRef}>
+          <button
+            onClick={() => setMenuOpen(!menuOpen)}
+            disabled={disabled}
+            className="flex items-center gap-1 px-3 py-1.5 text-sm bg-[var(--color-primary)] text-white hover:bg-[var(--color-primary-dark)] disabled:opacity-50 disabled:cursor-not-allowed rounded-md transition-colors"
+          >
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+            </svg>
+            新建
+            <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+            </svg>
+          </button>
 
-        {menuOpen && (
-          <div className="absolute top-full left-0 mt-1 bg-[var(--color-paper)] border border-[var(--color-border)] rounded-md shadow-lg py-1 z-50 min-w-[120px]">
-            {workspaceType === 'jasblog' ? (
-              // JasBlog 模式: 显示内容类型选项
-              (JASBLOG_CONTENT_TYPES as readonly JasBlogContentType[]).map((type) => (
-                <button
-                  key={type}
-                  onClick={() => handleNewFile(type)}
-                  className="w-full px-4 py-2 text-sm text-left hover:bg-[var(--color-surface)] transition-colors"
-                >
-                  {CONTENT_TYPE_LABELS[type]}
-                </button>
-              ))
-            ) : (
-              // 普通文档模式: 显示新建文档和新建文件夹
-              <>
-                <button
-                  onClick={handleNewDoc}
-                  className="w-full px-4 py-2 text-sm text-left hover:bg-[var(--color-surface)] transition-colors flex items-center gap-2"
-                >
-                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                  </svg>
-                  新建文档
-                </button>
-                <button
-                  onClick={handleNewFolder}
-                  className="w-full px-4 py-2 text-sm text-left hover:bg-[var(--color-surface)] transition-colors flex items-center gap-2"
-                >
-                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 13h6m-3-3v6m-9 1V7a2 2 0 012-2h6l2 2h6a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2z" />
-                  </svg>
-                  新建文件夹
-                </button>
-              </>
-            )}
-          </div>
-        )}
+          {menuOpen && (
+            <div className="absolute top-full left-0 mt-1 bg-[var(--color-paper)] border border-[var(--color-border)] rounded-md shadow-lg py-1 z-50 min-w-[120px]">
+              {workspaceType === 'jasblog' ? (
+                // JasBlog 模式: 显示内容类型选项
+                (JASBLOG_CONTENT_TYPES as readonly JasBlogContentType[]).map((type) => (
+                  <button
+                    key={type}
+                    onClick={() => handleNewFile(type)}
+                    className="w-full px-4 py-2 text-sm text-left hover:bg-[var(--color-surface)] transition-colors"
+                  >
+                    {CONTENT_TYPE_LABELS[type]}
+                  </button>
+                ))
+              ) : (
+                // 普通文档模式: 显示新建文档和新建文件夹
+                <>
+                  <button
+                    onClick={handleNewDoc}
+                    className="w-full px-4 py-2 text-sm text-left hover:bg-[var(--color-surface)] transition-colors flex items-center gap-2"
+                  >
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                    </svg>
+                    新建文档
+                  </button>
+                  <button
+                    onClick={handleNewFolder}
+                    className="w-full px-4 py-2 text-sm text-left hover:bg-[var(--color-surface)] transition-colors flex items-center gap-2"
+                  >
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 13h6m-3-3v6m-9 1V7a2 2 0 012-2h6l2 2h6a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2z" />
+                    </svg>
+                    新建文件夹
+                  </button>
+                </>
+              )}
+            </div>
+          )}
+        </div>
       </div>
 
-      {/* 新建文件对话框 (JasBlog 模式) */}
+      {/* 模板选择对话框 (JasBlog 模式) */}
       {jasblogDialogType && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-          <div className="bg-[var(--color-paper)] rounded-lg p-6 w-[400px] shadow-xl">
-            <h3 className="text-lg font-medium mb-4">新建{CONTENT_TYPE_LABELS[jasblogDialogType]}</h3>
-            <input
-              type="text"
-              value={input}
-              onChange={(e) => setInput(e.target.value)}
-              placeholder={jasblogDialogType === 'diary'
-                ? '请输入相对路径（如: 2026/02/2026-02-18-09-00-morning-session）'
-                : '请输入文件名（不含扩展名）'}
-              className="w-full px-3 py-2 border border-[var(--color-border)] rounded-md focus:outline-none focus:border-[var(--color-primary)] mb-4"
-              autoFocus
-              onKeyDown={(e) => {
-                if (e.key === 'Enter') handleCreateJasblog();
-                if (e.key === 'Escape') closeAllDialogs();
-              }}
-            />
-            {jasblogDialogType === 'diary' && (
-              <p className="text-xs text-[var(--color-text-muted)] mb-4">
-                Diary 建议使用 <span className="font-mono">YYYY/MM</span> 目录结构；目录不存在时会自动创建。
-              </p>
-            )}
-            <div className="flex justify-end gap-2">
-              <button
-                onClick={closeAllDialogs}
-                className="px-4 py-2 text-sm text-[var(--color-text-muted)] hover:bg-[var(--color-surface)] rounded-md transition-colors"
-              >
-                取消
-              </button>
-              <button
-                onClick={handleCreateJasblog}
-                disabled={!input.trim()}
-                className="px-4 py-2 text-sm bg-[var(--color-primary)] text-white hover:bg-[var(--color-primary-dark)] disabled:opacity-50 rounded-md transition-colors"
-              >
-                创建
-              </button>
-            </div>
-          </div>
-        </div>
+        <TemplatePickerDialog
+          type={jasblogDialogType}
+          onConfirm={async (filename, content) => {
+            await onCreateJasblogFile(jasblogDialogType, filename, content);
+            closeAllDialogs();
+          }}
+          onCancel={closeAllDialogs}
+        />
       )}
 
       {/* 新建文档对话框 (普通文档模式) */}
@@ -249,4 +238,3 @@ export function NewMenu({ disabled, workspaceType, onCreateJasblogFile, onCreate
     </>
   );
 }
-

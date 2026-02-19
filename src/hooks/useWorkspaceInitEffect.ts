@@ -19,9 +19,14 @@ export function useWorkspaceInitEffect(options: UseWorkspaceInitEffectOptions): 
     let cancelled = false;
 
     void (async () => {
-      const resolved = await initWorkspace(workspacePath);
-      if (cancelled) return;
-      await onResolved?.(resolved);
+      try {
+        const resolved = await initWorkspace(workspacePath);
+        if (cancelled) return;
+        await onResolved?.(resolved);
+      } catch (error) {
+        if (cancelled) return;
+        console.error('初始化工作区失败:', error);
+      }
     })();
 
     return () => {

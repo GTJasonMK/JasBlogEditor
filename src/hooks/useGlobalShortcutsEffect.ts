@@ -13,16 +13,14 @@ export function useGlobalShortcutsEffect(): void {
   useEffect(() => {
     if (!isTauri()) return;
 
-    let unregisterAll: (() => Promise<void>) | null = null;
+    const registeredShortcuts = new Set<string>();
+    let disposed = false;
 
     const setupGlobalShortcuts = async () => {
       try {
-        const { register, unregisterAll: unregAll, isRegistered } = await import(
+        const { register, isRegistered } = await import(
           "@tauri-apps/plugin-global-shortcut"
         );
-
-        // 保存 unregisterAll 引用以便清理
-        unregisterAll = unregAll;
 
         // 检查并跳过已注册的快捷键（避免热重载时重复注册错误）
         const isCtrlAltXRegistered = await isRegistered("Ctrl+Alt+X");
@@ -38,6 +36,12 @@ export function useGlobalShortcutsEffect(): void {
               }
             }
           });
+          if (disposed) {
+            const { unregister } = await import("@tauri-apps/plugin-global-shortcut");
+            await unregister("Ctrl+Alt+X");
+          } else {
+            registeredShortcuts.add("Ctrl+Alt+X");
+          }
         }
 
         // Ctrl+Alt+S 直接进入迷你写作模式并聚焦到文末
@@ -63,6 +67,12 @@ export function useGlobalShortcutsEffect(): void {
               }, 100);
             }
           });
+          if (disposed) {
+            const { unregister } = await import("@tauri-apps/plugin-global-shortcut");
+            await unregister("Ctrl+Alt+S");
+          } else {
+            registeredShortcuts.add("Ctrl+Alt+S");
+          }
         }
       } catch (error) {
         console.error("[GlobalShortcut] 注册全局快捷键失败:", error);
@@ -72,9 +82,24 @@ export function useGlobalShortcutsEffect(): void {
     setupGlobalShortcuts();
 
     return () => {
-      if (unregisterAll) {
-        unregisterAll().catch(console.error);
-      }
+      disposed = true;
+      if (registeredShortcuts.size === 0) return;
+
+      void (async () => {
+        try {
+          const { unregister, isRegistered } = await import("@tauri-apps/plugin-global-shortcut");
+          await Promise.all(
+            Array.from(registeredShortcuts).map(async (shortcut) => {
+              const exists = await isRegistered(shortcut);
+              if (exists) {
+                await unregister(shortcut);
+              }
+            })
+          );
+        } catch (error) {
+          console.error("[GlobalShortcut] 注销全局快捷键失败:", error);
+        }
+      })();
     };
   }, []);
 }
