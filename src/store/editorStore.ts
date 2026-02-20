@@ -73,6 +73,9 @@ interface EditorState {
   diaryTimelineYear: string;
   diaryTimelineMonth: string;
 
+  // AI 助手面板
+  aiPanelVisible: boolean;
+
   openFile: (path: string, type: ContentType) => Promise<void>;
   closeFile: () => void;
   updateContent: (content: string) => void;
@@ -89,6 +92,8 @@ interface EditorState {
   setNotesListTag: (tag: string) => void;
   setDiaryTimelineYear: (year: string) => void;
   setDiaryTimelineMonth: (month: string) => void;
+  toggleAIPanel: () => void;
+  setAIPanelVisible: (visible: boolean) => void;
   clearError: () => void;
 }
 
@@ -102,6 +107,8 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   notesListTag: '',
   diaryTimelineYear: 'all',
   diaryTimelineMonth: 'all',
+
+  aiPanelVisible: false,
 
   openFile: async (path, type) => {
     set({ isLoading: true, error: null });
@@ -409,6 +416,14 @@ export const useEditorStore = create<EditorState>((set, get) => ({
 
   setDiaryTimelineMonth: (month) => {
     set({ diaryTimelineMonth: month });
+  },
+
+  toggleAIPanel: () => {
+    set((state) => ({ aiPanelVisible: !state.aiPanelVisible }));
+  },
+
+  setAIPanelVisible: (visible) => {
+    set({ aiPanelVisible: visible });
   },
 
   clearError: () => {

@@ -35,6 +35,14 @@ pub struct UserTemplate {
     pub updated_at: String,
 }
 
+// LLM 配置结构体
+#[derive(Debug, Serialize, Deserialize, Clone, Default)]
+pub struct LLMSettings {
+    pub api_key: Option<String>,
+    pub base_url: Option<String>,
+    pub model: Option<String>,
+}
+
 // 设置结构体
 #[derive(Debug, Serialize, Deserialize, Default)]
 pub struct Settings {
@@ -43,6 +51,7 @@ pub struct Settings {
     pub last_opened_file: Option<String>,
     pub mini_mode_settings: Option<MiniModeSettings>,
     pub theme: Option<String>,  // "light" | "dark" | "system"
+    pub llm: Option<LLMSettings>,
 }
 
 // 获取模板文件路径
@@ -229,12 +238,42 @@ fn save_templates(templates: Vec<UserTemplate>) -> Result<(), String> {
         .map_err(|e| format!("保存模板失败: {}", e))
 }
 
+// 追加写入文件（用于 JSONL 日志等场景）
+#[tauri::command]
+fn append_file(path: String, content: String) -> Result<(), String> {
+    use std::io::Write;
+    // 确保父目录存在
+    if let Some(parent) = std::path::Path::new(&path).parent() {
+        fs::create_dir_all(parent)
+            .map_err(|e| format!("创建目录失败: {}", e))?;
+    }
+    let mut file = std::fs::OpenOptions::new()
+        .create(true)
+        .append(true)
+        .open(&path)
+        .map_err(|e| format!("打开文件失败: {}", e))?;
+    file.write_all(content.as_bytes())
+        .map_err(|e| format!("写入文件失败: {}", e))
+}
+
+// 获取应用数据目录路径
+#[tauri::command]
+fn get_app_data_dir() -> Result<String, String> {
+    let app_dir = dirs_next::data_dir()
+        .ok_or("无法获取应用数据目录".to_string())?
+        .join("JasBlogEditor");
+    fs::create_dir_all(&app_dir)
+        .map_err(|e| format!("创建目录失败: {}", e))?;
+    Ok(app_dir.to_string_lossy().to_string())
+}
+
 pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_fs::init())
         .plugin(tauri_plugin_global_shortcut::Builder::new().build())
+        .plugin(tauri_plugin_http::init())
         .invoke_handler(tauri::generate_handler![
             read_directory,
             read_file,
@@ -247,7 +286,9 @@ pub fn run() {
             get_settings,
             save_settings,
             get_templates,
-            save_templates
+            save_templates,
+            append_file,
+            get_app_data_dir
         ])
         .setup(|app| {
             // 在 Windows 上启用 WebView2 的 pinch zoom

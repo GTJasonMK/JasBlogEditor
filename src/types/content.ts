@@ -276,6 +276,14 @@ export interface Settings {
   lastOpenedFile: string | null;
   miniModeSettings?: MiniModeSettings;
   theme?: ThemeMode;  // 主题模式
+  llm?: LLMSettings;  // LLM 配置
+}
+
+// LLM 相关设置
+export interface LLMSettings {
+  apiKey?: string;
+  baseUrl?: string;
+  model?: string;
 }
 
 // 迷你写作模式窗口配置

@@ -1,4 +1,5 @@
 import { type ReactNode, useCallback, useEffect, useMemo, useState } from 'react';
+import '@/preview.css';
 import { isTauri } from '@/platform/runtime';
 import { invokeTauri } from '@/platform/tauri';
 import { buildDiaryEntryId, inferDiaryFromFileName, resolveDiaryDate } from '@/services/diary';

@@ -21,12 +21,19 @@ export interface RustMiniModeSettings {
   position_y?: number;
 }
 
+export interface RustLLMSettings {
+  api_key?: string;
+  base_url?: string;
+  model?: string;
+}
+
 export interface RustSettings {
   workspace_path: string | null;
   workspace_type: string | null;
   last_opened_file: string | null;
   mini_mode_settings?: RustMiniModeSettings;
   theme?: string | null;
+  llm?: RustLLMSettings;
 }
 
 // Rust 用户模板结构（与 src-tauri/src/lib.rs UserTemplate 保持一致）

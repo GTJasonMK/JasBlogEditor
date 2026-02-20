@@ -5,6 +5,7 @@ import remarkMath from "remark-math";
 import rehypeHighlight from "rehype-highlight";
 import rehypeKatex from "rehype-katex";
 import "katex/dist/katex.min.css";
+import "@/preview.css";
 import { MermaidDiagram } from "./MermaidDiagram";
 import { extractText, generateId } from "@/utils";
 

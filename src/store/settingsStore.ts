@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { invokeTauri } from '@/platform/tauri';
-import type { Settings, MiniModeSettings, WorkspaceType, ThemeMode } from '@/types';
+import type { Settings, MiniModeSettings, WorkspaceType, ThemeMode, LLMSettings } from '@/types';
 import type { RustSettings } from '@/platform/tauriTypes';
 
 interface SettingsState {
@@ -13,6 +13,7 @@ interface SettingsState {
   setWorkspaceType: (type: WorkspaceType) => Promise<void>;
   setTheme: (theme: ThemeMode) => Promise<void>;
   saveMiniModeSettings: (miniSettings: MiniModeSettings) => Promise<void>;
+  saveLLMSettings: (llmSettings: LLMSettings) => Promise<void>;
   clearError: () => void;
 }
 
@@ -29,6 +30,11 @@ function toRustSettings(settings: Settings): RustSettings {
       position_y: settings.miniModeSettings.positionY,
     } : undefined,
     theme: settings.theme || null,
+    llm: settings.llm ? {
+      api_key: settings.llm.apiKey,
+      base_url: settings.llm.baseUrl,
+      model: settings.llm.model,
+    } : undefined,
   };
 }
 
@@ -45,6 +51,11 @@ function fromRustSettings(rust: RustSettings): Settings {
       positionY: rust.mini_mode_settings.position_y,
     } : undefined,
     theme: (rust.theme as ThemeMode) || 'system',
+    llm: rust.llm ? {
+      apiKey: rust.llm.api_key,
+      baseUrl: rust.llm.base_url,
+      model: rust.llm.model,
+    } : undefined,
   };
 }
 
@@ -103,6 +114,11 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
   saveMiniModeSettings: async (miniSettings) => {
     const { saveSettings } = get();
     await saveSettings({ miniModeSettings: miniSettings });
+  },
+
+  saveLLMSettings: async (llmSettings) => {
+    const { saveSettings } = get();
+    await saveSettings({ llm: llmSettings });
   },
 
   clearError: () => {

@@ -20,6 +20,8 @@ export type TauriCommandMap = {
   save_settings: { args: { settings: RustSettings }; result: void };
   get_templates: { args: undefined; result: RustUserTemplate[] };
   save_templates: { args: { templates: RustUserTemplate[] }; result: void };
+  append_file: { args: { path: string; content: string }; result: void };
+  get_app_data_dir: { args: undefined; result: string };
 };
 
 type TypedArgs<C extends keyof TauriCommandMap> = TauriCommandMap[C]["args"];

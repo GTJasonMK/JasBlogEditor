@@ -12,6 +12,7 @@ import { PreviewModeToggle } from './toolbar/PreviewModeToggle';
 import { ErrorToast } from './toolbar/ErrorToast';
 import { JasBlogSearchModal } from './toolbar/JasBlogSearchModal';
 import { SaveAsTemplateDialog } from './toolbar/SaveAsTemplateDialog';
+import { LLMSettingsDialog } from './toolbar/LLMSettingsDialog';
 
 // HelpModal 内部导入全部预览组件 + MarkdownRenderer + mermaid 等重型依赖，仅在用户打开帮助时才加载
 const LazyHelpModal = lazy(() =>
@@ -42,6 +43,8 @@ export function Toolbar() {
     createFolder,
     createNewFile,
     deleteFile,
+    aiPanelVisible,
+    toggleAIPanel,
   } = useEditorStore();
   const { toggleMiniMode, error: windowError, clearError: clearWindowError } = useWindowStore();
   const { saveAsTemplate, error: templateError, clearError: clearTemplateError } = useTemplateStore();
@@ -49,6 +52,7 @@ export function Toolbar() {
   const [helpOpen, setHelpOpen] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
   const [saveTemplateOpen, setSaveTemplateOpen] = useState(false);
+  const [llmSettingsOpen, setLlmSettingsOpen] = useState(false);
 
   const currentTheme = settings.theme || 'system';
   const effectiveTheme = getEffectiveTheme(currentTheme);
@@ -260,6 +264,45 @@ export function Toolbar() {
           </button>
         )}
 
+        {/* AI 助手按钮 */}
+        {currentFile && viewMode !== 'preview' && (
+          <button
+            onClick={() => {
+              if (!settings.llm?.apiKey) {
+                setLlmSettingsOpen(true);
+              } else {
+                toggleAIPanel();
+              }
+            }}
+            className={`flex items-center gap-1 px-3 py-1.5 text-sm rounded-md transition-colors ${
+              aiPanelVisible
+                ? 'bg-[var(--color-primary)] text-white'
+                : 'text-[var(--color-text-muted)] hover:bg-[var(--color-surface)]'
+            }`}
+            title="AI 助手 (Ctrl+I)"
+          >
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+            </svg>
+            AI
+          </button>
+        )}
+
+        {/* LLM 设置按钮 */}
+        <button
+          onClick={() => setLlmSettingsOpen(true)}
+          className="relative flex items-center gap-1 px-2 py-1.5 text-sm text-[var(--color-text-muted)] hover:text-[var(--color-text)] hover:bg-[var(--color-surface)] rounded-md transition-colors"
+          title="LLM 设置"
+        >
+          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.066 2.573c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.573 1.066c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.066-2.573c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+          </svg>
+          {!settings.llm?.apiKey && (
+            <span className="absolute -top-0.5 -right-0.5 w-2 h-2 bg-[var(--color-primary)] rounded-full" />
+          )}
+        </button>
+
         {/* 右侧分隔 */}
         <div className="flex-1" />
 
@@ -350,6 +393,11 @@ export function Toolbar() {
           }}
           onCancel={() => setSaveTemplateOpen(false)}
         />
+      )}
+
+      {/* LLM 设置对话框 */}
+      {llmSettingsOpen && (
+        <LLMSettingsDialog onClose={() => setLlmSettingsOpen(false)} />
       )}
     </>
   );
