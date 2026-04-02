@@ -7,6 +7,7 @@ import rehypeKatex from "rehype-katex";
 import "katex/dist/katex.min.css";
 import "@/preview.css";
 import { MermaidDiagram } from "./MermaidDiagram";
+import { resolveImageDimensions } from "./imageDimensions";
 import { extractText, generateId } from "@/utils";
 
 // 与 JasBlog 的 preprocess-alerts.ts 行为对齐：将 blockquote 的 [!NOTE] 等语法替换为内部标记
@@ -64,8 +65,19 @@ function CopyButton({ code }: { code: string }) {
 }
 
 // 图片缩放组件
-function ImageZoom({ src, alt }: { src?: string | undefined; alt?: string }) {
+function ImageZoom({
+  src,
+  alt,
+  width,
+  height,
+}: {
+  src?: string | undefined;
+  alt?: string;
+  width?: string | number;
+  height?: string | number;
+}) {
   const [zoomed, setZoomed] = useState(false);
+  const resolved = resolveImageDimensions({ width, height });
 
   if (!src || typeof src !== "string") return null;
 
@@ -75,6 +87,8 @@ function ImageZoom({ src, alt }: { src?: string | undefined; alt?: string }) {
         <img
           src={src}
           alt={alt || ""}
+          width={resolved.width}
+          height={resolved.height}
           className="rounded-lg max-w-full h-auto mx-auto cursor-zoom-in"
           loading="lazy"
           onClick={() => setZoomed(true)}
@@ -306,9 +320,9 @@ export function MarkdownRenderer({ content }: MarkdownRendererProps) {
           );
         },
         // 图片（可缩放）
-        img: ({ src, alt }) => {
+        img: ({ src, alt, width, height }) => {
           const imgSrc = typeof src === "string" ? src : undefined;
-          return <ImageZoom src={imgSrc} alt={alt} />;
+          return <ImageZoom src={imgSrc} alt={alt} width={width} height={height} />;
         },
         // 代码块（带复制按钮、语言标签、Mermaid 支持）
         pre: ({ children }) => <CodeBlock>{children}</CodeBlock>,

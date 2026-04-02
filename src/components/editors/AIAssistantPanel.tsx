@@ -2,7 +2,7 @@ import { useState, useRef, useEffect, useCallback } from 'react';
 import { useSettingsStore } from '@/store';
 import { LLMClient } from '@/services/llm';
 import type { ChatMessage } from '@/services/llm';
-import type { ContentType } from '@/types';
+import { DIARY_DISPLAY_LABEL, type ContentType } from '@/types';
 
 type AIAction = 'continue' | 'polish' | 'summary' | 'translate' | 'custom';
 
@@ -53,12 +53,12 @@ const TYPE_CONTEXT: Record<ContentType, string> = {
 - 代码示例标注语言，展示关键用法
 - 典型结构：项目简介 → 功能特性 → 快速开始 → 项目结构 → 开发计划`,
 
-  diary: `当前编辑的是「日记」类型。写作风格要求：
-- 个人化、叙事性的文风，可以感性表达
-- 记录见闻、感受、反思
-- 可使用引用块记录对话或印象深刻的句子
-- 适当使用列表记录行程或花费
-- 典型结构：经历描述 → 感受/反思 → 收获/计划`,
+  diary: `当前编辑的是「${DIARY_DISPLAY_LABEL}」类型。写作风格要求：
+- 聚焦复习进度、掌握情况、情绪状态与反思
+- 记录科目安排、完成情况、错题或卡点
+- 适合使用列表梳理任务与次日计划
+- 可用引用块记录提醒、口诀或当天总结
+- 典型结构：今日目标 → 完成情况 → 问题复盘 → 明日计划`,
 
   roadmap: `当前编辑的是「规划」类型。正文使用特殊的任务语法，必须严格遵守：
 - 任务行格式：\`- [ ] 任务描述 \\\`priority\\\`\`（priority: high/medium/low）

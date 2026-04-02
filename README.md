@@ -4,12 +4,12 @@
 
 ## 功能特性
 
-- **多内容类型支持**: 笔记 (notes)、项目 (projects)、日记 (diary)、规划 (roadmaps)、知识图谱 (graphs)
-- **JasBlog 日记支持**: 支持 `content/diary/YYYY/MM/*.md` 结构的日记条目编辑与预览
-- **Diary 同日聚合预览**: 自动加载同一天的其他条目并按时间排序渲染（对齐 JasBlog `/diary/[slug]` 展示）
+- **多内容类型支持**: 笔记 (notes)、项目 (projects)、考研日志 (diary)、规划 (roadmaps)、知识图谱 (graphs)
+- **JasBlog 考研日志支持**: 支持 `content/diary/YYYY/MM/*.md` 结构的日志条目编辑与预览
+- **考研日志同日聚合预览**: 自动加载同一天的其他条目并按时间排序渲染（对齐 JasBlog `/diary/[slug]` 展示）
 - **Markdown 编辑**: 支持 YAML frontmatter、GFM 语法、数学公式 (KaTeX)、Mermaid 图表
 - **实时预览**: 编辑/预览/分屏三种视图模式
-- **列表页预览**: 预览区支持“详情/列表”切换，展示与 JasBlog 列表页一致的布局与筛选交互（Notes 标签筛选、Diary 年/月筛选时间线等）
+- **列表页预览**: 预览区支持“详情/列表”切换，展示与 JasBlog 列表页一致的布局与筛选交互（Notes 标签筛选、考研日志年/月筛选时间线等）
 - **JasBlog 全局搜索**: 支持 `/` 快捷键打开搜索弹窗，按标题/摘要/标签等检索并跳转打开文件
 - **Notes 评论区预览（可选）**: 支持通过 Giscus 嵌入评论区（需配置 `VITE_GISCUS_*` 环境变量）
 - **迷你写作模式**: 快捷键呼出悬浮小窗口，专注写作
@@ -98,8 +98,8 @@ src-tauri/                     # Rust 后端
 | 类型 | 扩展名 | 目录 | 说明 |
 |------|--------|------|------|
 | note | .md | notes/ | 笔记，支持 title, date, excerpt, tags |
-| project | .md | projects/ | 项目，支持 techStack, github, status |
-| diary | .md | diary/ | 日记条目，支持 title, date, time, mood 等字段（支持 YYYY/MM 子目录） |
+| project | .md | projects/ | 项目，支持 github, demo, date, tags, techStack |
+| diary | .md | diary/ | 考研日志条目，支持 title, date, time, mood 等字段（支持 YYYY/MM 子目录） |
 | roadmap | .md | roadmaps/ | 规划，支持 items 列表 |
 | graph | .md | graphs/ | 知识图谱（Markdown + ```graph 代码块），支持 nodes, edges |
 

@@ -68,29 +68,29 @@ export const BUILTIN_TEMPLATES: BuiltinTemplate[] = [
   // ── 日记 ──
   {
     id: 'diary-standard',
-    name: '标准日记',
-    description: '含心情、天气、地点等完整字段',
+    name: '标准考研日志',
+    description: '记录当天复习目标、完成情况与复盘',
     type: 'diary',
     buildContent: buildDiaryStandard,
   },
   {
     id: 'diary-simple',
-    name: '简单日记',
+    name: '简单考研日志',
     description: '仅标题、日期、时间、摘要',
     type: 'diary',
     buildContent: buildDiarySimple,
   },
   {
     id: 'diary-travel',
-    name: '旅行日记',
-    description: '旅行路线、见闻、美食、花费记录',
+    name: '模考复盘',
+    description: '记录模考表现、失分原因与调整计划',
     type: 'diary',
     buildContent: buildDiaryTravel,
   },
   {
     id: 'diary-weekly',
-    name: '周记',
-    description: '本周回顾、收获反思、下周计划',
+    name: '周复盘',
+    description: '回顾本周进度、问题与下周安排',
     type: 'diary',
     buildContent: buildDiaryWeekly,
   },
@@ -315,7 +315,6 @@ github:
 date: ${today}
 tags: []
 techStack: []
-status: active
 ---
 
 ## 项目介绍
@@ -364,7 +363,6 @@ name: ${baseName}
 description:
 date: ${today}
 tags: []
-status: active
 ---
 
 ## 项目介绍
@@ -407,6 +405,21 @@ location:
 companions: []
 ---
 
+## 今日复习目标
+
+- [ ] 
+
+## 完成情况
+
+- 
+
+## 问题复盘
+
+- 
+
+## 明日计划
+
+- [ ] 
 `;
 }
 
@@ -433,39 +446,31 @@ title: ${baseName}
 date: ${today}
 time: 09:00
 excerpt:
-tags: [旅行]
+tags: [模考, 复盘]
 mood:
 weather:
 location:
 companions: []
 ---
 
-## 今日路线
+## 模考概览
 
-<!-- 出发地 → 途经 → 目的地 -->
+- 科目：
+- 分数：
+- 用时：
 
-## 见闻
+## 失分点
 
-<!-- 记录旅途中印象深刻的人、事、景 -->
+<!-- 记录失误类型、知识盲区与时间分配问题 -->
 
-## 美食
+## 关键错题
 
-<!-- 今天吃了什么好吃的 -->
+<!-- 整理最值得回看的题目和原因 -->
 
-## 花费
+## 调整计划
 
-| 项目 | 金额 |
-|------|------|
-| 交通 | |
-| 住宿 | |
-| 餐饮 | |
-| 门票 | |
-| 其他 | |
-| **合计** | |
-
-## 随想
-
-<!-- 旅途感悟 -->
+- [ ] 下次模考前要完成的动作一
+- [ ] 下次模考前要完成的动作二
 `;
 }
 
@@ -478,25 +483,25 @@ title: ${baseName}
 date: ${today}
 time: 20:00
 excerpt:
-tags: [周记]
+tags: [周复盘]
 mood:
 ---
 
-## 本周回顾
+## 本周学习总览
 
-### 工作
-
--
-
-### 学习
+### 政治
 
 -
 
-### 生活
+### 英语
 
 -
 
-## 收获与反思
+### 专业课
+
+-
+
+## 收获与问题
 
 <!-- 这周做得好的、做得不好的、学到了什么 -->
 
@@ -527,15 +532,15 @@ status: active
 
 ## 第一阶段
 
-- [ ] \`high\` 核心任务一
-- [ ] \`high\` 核心任务二
-- [ ] \`medium\` 辅助任务
+- [ ] 核心任务一 \`high\`
+- [ ] 核心任务二 \`high\`
+- [ ] 辅助任务 \`medium\`
 
 ## 第二阶段
 
-- [ ] \`medium\` 扩展任务一
-- [ ] \`medium\` 扩展任务二
-- [ ] \`low\` 优化项
+- [ ] 扩展任务一 \`medium\`
+- [ ] 扩展任务二 \`medium\`
+- [ ] 优化项 \`low\`
 `;
 }
 
@@ -552,21 +557,21 @@ status: active
 
 ## 基础入门
 
-- [ ] \`high\` 阅读官方文档，了解核心概念
-- [ ] \`high\` 搭建本地开发环境
-- [ ] \`medium\` 完成官方入门教程
+- [ ] 阅读官方文档，了解核心概念 \`high\`
+- [ ] 搭建本地开发环境 \`high\`
+- [ ] 完成官方入门教程 \`medium\`
 
 ## 进阶提升
 
-- [ ] \`high\` 深入理解核心原理
-- [ ] \`medium\` 阅读源码关键模块
-- [ ] \`medium\` 学习最佳实践和设计模式
+- [ ] 深入理解核心原理 \`high\`
+- [ ] 阅读源码关键模块 \`medium\`
+- [ ] 学习最佳实践和设计模式 \`medium\`
 
 ## 实战应用
 
-- [ ] \`high\` 完成一个完整的练手项目
-- [ ] \`medium\` 总结踩坑经验，输出笔记
-- [ ] \`low\` 参与社区讨论或贡献 PR
+- [ ] 完成一个完整的练手项目 \`high\`
+- [ ] 总结踩坑经验，输出笔记 \`medium\`
+- [ ] 参与社区讨论或贡献 PR \`low\`
 `;
 }
 

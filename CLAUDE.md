@@ -79,7 +79,7 @@ src-tauri/                      # Rust 后端
 | 类型 | 目录 | 元数据接口 | 特殊说明 |
 |------|------|-----------|---------|
 | note | `content/notes/` | `NoteMetadata` (title, date, excerpt, tags) | |
-| project | `content/projects/` | `ProjectMetadata` (name, description, github, techStack, status) | |
+| project | `content/projects/` | `ProjectMetadata` (name, description, github, demo, date, tags, techStack) | |
 | diary | `content/diary/YYYY/MM/` | `DiaryMetadata` (title, date, time, companions) | 文件名格式 `YYYY-MM-DD-HH-mm-title.md`，可推断 date/time |
 | roadmap | `content/roadmaps/` | `RoadmapMetadata` (title, description, date, status) | 任务在正文用 `- [ ]/-[-]/- [x]` 语法，优先级用行内代码 `` `high` `` |
 | graph | `content/graphs/` | `GraphMetadata` (name, description) | 图数据存在正文的 ` ```graph``` ` 代码块中（JSON 格式） |

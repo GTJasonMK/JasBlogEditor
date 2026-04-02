@@ -104,7 +104,6 @@ function buildMetadata(
       date: parsed.date ? String(parsed.date) : undefined,
       tags: normalizeStringArray(parsed.tags),
       techStack: normalizeTechStack(parsed.techStack),
-      status: normalizeStatus(parsed.status),
     };
   }
 
@@ -237,14 +236,6 @@ function normalizeTime(value: unknown): string {
 }
 
 /**
- * 标准化项目状态
- */
-function normalizeStatus(value: unknown): 'active' | 'archived' | 'wip' {
-  if (value === 'archived' || value === 'wip') return value;
-  return 'active';
-}
-
-/**
  * 标准化规划状态
  */
 function normalizeRoadmapStatus(value: unknown): 'active' | 'completed' | 'paused' {
@@ -287,7 +278,7 @@ export function parseRoadmapItemsFromContent(content: string): { items: RoadmapI
   let itemId = 1;
 
   // 任务行正则：- [ ] 或 - [-] 或 - [x] 开头，后面是标题，可选 `priority`
-  const taskRegex = /^-\s*\[([ xX\-])\]\s+(.+?)(?:\s+`(high|medium|low)`)?\s*$/;
+  const taskRegex = /^[-*+]\s*\[([ xX\-])\]\s+(.+?)(?:\s+`(high|medium|low)`)?\s*$/;
   // 缩进行正则（至少2个空格或1个 Tab）
   const indentRegex = /^(?:\t| {2,})(.+)$/;
   // 截止日期正则
@@ -726,7 +717,6 @@ function getDefaultMetadata(type: ContentType): NoteMetadata | ProjectMetadata |
       description: '',
       github: '',
       tags: [],
-      status: 'active',
     };
   }
 

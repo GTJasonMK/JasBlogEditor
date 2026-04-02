@@ -11,7 +11,7 @@
     "build": "tsc -b && vite build",
     "build:app": "tauri build",
     "preview": "vite preview",
-    "test": "node --test scripts/dev-port.test.mjs",
+    "test": "node --loader ./scripts/ts-loader.mjs --test scripts/dev-port.test.mjs scripts/document-agent-runtime.test.ts scripts/document-mcp-contract.test.ts scripts/diary-ui-labels.test.ts scripts/content-parity.test.ts scripts/ui-copy.test.ts",
     "tauri": "node scripts/tauri.mjs"
   },
   "dependencies": {

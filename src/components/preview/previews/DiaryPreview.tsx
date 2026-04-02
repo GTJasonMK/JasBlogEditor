@@ -4,7 +4,7 @@ import { buildDiaryEntryId, DIARY_DATE_PATTERN, type DiaryNameInference, inferDi
 import { parseMarkdownContent } from '@/services/contentParser';
 import { useFileStore } from '@/store';
 import { collectLeafFiles, isSamePath } from '@/utils';
-import type { DiaryMetadata } from '@/types';
+import { DIARY_TIMELINE_LABEL, type DiaryMetadata } from '@/types';
 import type { FileTreeNode } from '@/store/fileStore';
 import { MarkdownRenderer } from '../MarkdownRenderer';
 import { PreviewBackButton } from '../PreviewBackButton';
@@ -74,7 +74,7 @@ function buildDiaryDay(date: string, entries: DiaryEntry[]): DiaryDay {
     latestEntry.excerpt ||
     sortedEntries.map((entry) => entry.excerpt).find(Boolean) ||
     '';
-  const title = sortedEntries.length === 1 ? sortedEntries[0].title : `${date} diary`;
+  const title = sortedEntries.length === 1 ? sortedEntries[0].title : `${date} 考研日志`;
 
   return {
     slug: date,
@@ -278,14 +278,14 @@ export function DiaryPreview({ filePath, fileName, metadata, content, aggregateB
   return (
     <div className="max-w-4xl mx-auto px-6 py-12">
       {!embedded && (
-        <PreviewBackButton label="返回日记时间线" />
+        <PreviewBackButton label={`返回${DIARY_TIMELINE_LABEL}`} />
       )}
 
       <header className="mb-8">
         <div className="flex flex-wrap items-center gap-3 mb-2">
           <PreviewDate date={day.date} />
           <span className="text-xs px-2 py-0.5 rounded bg-[var(--color-paper-dark)] text-[var(--color-gray)]">
-            {day.entryCount} entries
+            {day.entryCount} 条记录
           </span>
           {day.mood && <span className="tag">{day.mood}</span>}
           {day.weather && <span className="tag">{day.weather}</span>}

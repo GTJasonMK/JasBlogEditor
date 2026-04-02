@@ -1,12 +1,12 @@
 import { useCallback, useEffect } from "react";
 import { Toolbar, Sidebar, EditorArea, MetadataPanel, MiniModeLayout } from "@/components";
-import { useSettingsStore, useFileStore, useEditorStore, useWindowStore, useTemplateStore } from "@/store";
+import { useSettingsStore, useFileStore, useEditorStore, useAgentStore, useWindowStore, useTemplateStore } from "@/store";
 import { useGlobalShortcutsEffect, useSaveShortcutEffect, useThemeEffect, useWorkspaceInitEffect, useAIShortcutEffect } from "@/hooks";
 
 function App() {
   const { loadSettings, saveSettings, settings } = useSettingsStore();
   const { initWorkspace } = useFileStore();
-  const saveFile = useEditorStore((state) => state.saveFile);
+  const saveActiveDocument = useAgentStore((state) => state.saveActiveDocument);
   const currentFile = useEditorStore((state) => state.currentFile);
   const viewMode = useEditorStore((state) => state.viewMode);
   const toggleAIPanel = useEditorStore((state) => state.toggleAIPanel);
@@ -41,7 +41,12 @@ function App() {
     onResolved: handleWorkspaceResolved,
   });
   useGlobalShortcutsEffect();
-  useSaveShortcutEffect({ enabled: !!currentFile?.isDirty, onSave: saveFile });
+  useSaveShortcutEffect({
+    enabled: !!currentFile?.isDirty,
+    onSave: async () => {
+      await saveActiveDocument();
+    },
+  });
   useAIShortcutEffect({ enabled: !!currentFile && viewMode !== 'preview', onToggle: toggleAIPanel });
 
   // 迷你模式：只显示编辑区域

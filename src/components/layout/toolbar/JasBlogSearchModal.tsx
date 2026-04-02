@@ -583,7 +583,7 @@ export function JasBlogSearchModal({ open, onClose }: JasBlogSearchModalProps) {
                 value={query}
                 onChange={(event) => setQuery(event.target.value)}
                 onKeyDown={handleKeyDown}
-                placeholder="搜索 notes / diary / projects / graphs / roadmap（快捷键：/）"
+                placeholder="搜索 notes / diary（考研日志） / projects / graphs / roadmap（快捷键：/）"
                 className="flex-1 bg-white border border-[var(--color-paper-darker)] rounded-md px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-[var(--color-vermilion)]"
               />
               <button

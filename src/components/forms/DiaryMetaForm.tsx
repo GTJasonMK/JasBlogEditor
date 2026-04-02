@@ -1,6 +1,6 @@
 import { useEditorStore } from '@/store';
 import { TagInput } from './TagInput';
-import type { DiaryMetadata } from '@/types';
+import { DIARY_DISPLAY_LABEL, type DiaryMetadata } from '@/types';
 
 export function DiaryMetaForm() {
   const { currentFile, updateMetadata } = useEditorStore();
@@ -62,7 +62,7 @@ export function DiaryMetaForm() {
           className="w-full px-3 py-2 text-sm border border-[var(--color-border)] rounded-md focus:outline-none focus:border-[var(--color-primary)]"
         />
         <p className="text-xs text-[var(--color-text-subtle)] mt-1">
-          建议使用 <span className="font-mono">HH:MM</span>（例如 09:30），用于 JasBlog 日记页的时间标签展示
+          建议使用 <span className="font-mono">HH:MM</span>（例如 09:30），用于 JasBlog {DIARY_DISPLAY_LABEL}页的时间标签展示
         </p>
       </div>
 
@@ -129,4 +129,3 @@ export function DiaryMetaForm() {
     </div>
   );
 }
-

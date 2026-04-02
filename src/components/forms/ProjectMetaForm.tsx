@@ -100,20 +100,6 @@ export function ProjectMetaForm() {
         )}
       </div>
 
-      {/* 状态 */}
-      <div>
-        <label className="block text-xs text-[var(--color-text-muted)] mb-1">状态</label>
-        <select
-          value={metadata.status || 'active'}
-          onChange={(e) => updateMetadata({ status: e.target.value as 'active' | 'archived' | 'wip' })}
-          className="w-full px-3 py-2 text-sm border border-[var(--color-border)] rounded-md focus:outline-none focus:border-[var(--color-primary)]"
-        >
-          <option value="active">活跃</option>
-          <option value="wip">开发中</option>
-          <option value="archived">归档</option>
-        </select>
-      </div>
-
       {/* 技术栈 */}
       <div>
         <label className="block text-xs text-[var(--color-text-muted)] mb-1">技术栈</label>

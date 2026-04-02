@@ -16,11 +16,14 @@ export type ContentType = 'note' | 'project' | 'diary' | 'roadmap' | 'graph' | '
 export const JASBLOG_CONTENT_TYPES = ['project', 'note', 'diary', 'graph', 'roadmap'] as const;
 export type JasBlogContentType = (typeof JASBLOG_CONTENT_TYPES)[number];
 
+export const DIARY_DISPLAY_LABEL = '考研日志';
+export const DIARY_TIMELINE_LABEL = `${DIARY_DISPLAY_LABEL}时间线`;
+
 // 内容类型中文标签（用于 UI 显示）
 export const CONTENT_TYPE_LABELS: Record<ContentType, string> = {
   note: '笔记',
   project: '项目',
-  diary: '日记',
+  diary: DIARY_DISPLAY_LABEL,
   roadmap: '规划',
   graph: '图谱',
   doc: '文档',
@@ -30,7 +33,7 @@ export const CONTENT_TYPE_LABELS: Record<ContentType, string> = {
 export const JASBLOG_SECTION_LABELS: Record<JasBlogContentType, string> = {
   project: '开源项目',
   note: '学习笔记',
-  diary: '日记',
+  diary: DIARY_DISPLAY_LABEL,
   graph: '知识图谱',
   roadmap: '我的规划',
 };
@@ -76,7 +79,6 @@ export interface ProjectMetadata {
   date?: string;
   tags?: string[];
   techStack?: TechStackItem[];
-  status?: 'active' | 'archived' | 'wip';
 }
 
 export interface TechStackItem {

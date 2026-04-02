@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useTemplateStore } from '@/store';
 import { getBuiltinTemplates, applyTemplateToFilename } from '@/services/contentTemplates';
-import { CONTENT_TYPE_LABELS } from '@/types';
+import { CONTENT_TYPE_LABELS, DIARY_DISPLAY_LABEL } from '@/types';
 import type { BuiltinTemplate } from '@/services/contentTemplates';
 import type { JasBlogContentType, UserTemplate } from '@/types';
 
@@ -74,7 +74,7 @@ export function TemplatePickerDialog({ type, onConfirm, onCancel }: TemplatePick
           value={filename}
           onChange={(e) => setFilename(e.target.value)}
           placeholder={type === 'diary'
-            ? '请输入相对路径（如: 2026/02/2026-02-18-09-00-morning-session）'
+            ? '请输入相对路径（如: 2026/02/2026-02-18-09-00-political-review）'
             : '请输入文件名（不含扩展名）'}
           className="w-full px-3 py-2 border border-[var(--color-border)] rounded-md focus:outline-none focus:border-[var(--color-primary)] mb-2 bg-[var(--color-bg)] text-[var(--color-text)]"
           autoFocus
@@ -82,7 +82,7 @@ export function TemplatePickerDialog({ type, onConfirm, onCancel }: TemplatePick
         />
         {type === 'diary' && (
           <p className="text-xs text-[var(--color-text-muted)] mb-3">
-            Diary 建议使用 <span className="font-mono">YYYY/MM</span> 目录结构；目录不存在时会自动创建。
+            {DIARY_DISPLAY_LABEL}建议使用 <span className="font-mono">YYYY/MM</span> 目录结构；目录不存在时会自动创建。
           </p>
         )}
 

@@ -3,8 +3,6 @@ import { invokeTauri } from '@/platform/tauri';
 import { inferDiaryFromFileName } from '@/services/diary';
 import {
   parseMarkdownContent,
-  serializeDocContentPreservingFrontmatter,
-  serializeMarkdownContentPreservingFrontmatter,
 } from '@/services/contentParser';
 import {
   buildDocFilePath,
@@ -13,6 +11,7 @@ import {
   createNewDocMarkdown,
   createNewJasblogMarkdown,
 } from '@/services/contentTemplates';
+import { prepareDocumentSave } from '@/services/documentPersistence';
 import type { ContentType, EditorFile, NoteMetadata, ProjectMetadata, DiaryMetadata, RoadmapMetadata, GraphMetadata, DocMetadata, JasBlogContentType } from '@/types';
 
 type Metadata = NoteMetadata | ProjectMetadata | DiaryMetadata | RoadmapMetadata | GraphMetadata | DocMetadata;
@@ -212,69 +211,15 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     set({ isLoading: true, error: null });
 
     try {
-      let fileContent: string;
-
-      if (currentFile.type === 'doc') {
-        // 普通文档：根据 hasFrontmatter 决定是否保留 frontmatter
-        const metadata = currentFile.metadata as DocMetadata;
-        const shouldIncludeFrontmatter = currentFile.hasFrontmatter || !!metadata.title;
-        if (currentFile.hasFrontmatter && currentFile.frontmatterBlock && !currentFile.metadataDirty) {
-          // 仅正文变更时，原样复用 frontmatter（保留注释/格式）
-          fileContent = `${currentFile.frontmatterBlock}${currentFile.content}`;
-        } else {
-          fileContent = serializeDocContentPreservingFrontmatter(metadata, currentFile.content, {
-            includeFrontmatter: shouldIncludeFrontmatter,
-            frontmatterBlock: currentFile.frontmatterBlock,
-          });
-        }
-      } else {
-        if (currentFile.hasFrontmatter && currentFile.frontmatterBlock && !currentFile.metadataDirty) {
-          // 仅正文变更时，原样复用 frontmatter（保留注释/格式），避免保存产生无意义 diff
-          fileContent = `${currentFile.frontmatterBlock}${currentFile.content}`;
-        } else {
-          // JasBlog 内容类型统一使用 Markdown 序列化
-          fileContent = serializeMarkdownContentPreservingFrontmatter(
-            currentFile.metadata as NoteMetadata | ProjectMetadata | DiaryMetadata | RoadmapMetadata | GraphMetadata,
-            currentFile.content,
-            {
-              frontmatterBlock: currentFile.frontmatterBlock,
-              frontmatterRaw: currentFile.frontmatterRaw,
-            }
-          );
-        }
-      }
-
-      // 尽量保持字节一致：保持原文件的换行风格（JasBlog content 多为 CRLF）
-      const lineEnding = currentFile.lineEnding || 'lf';
-      fileContent = fileContent.replace(/\r\n/g, '\n');
-      if (lineEnding === 'crlf') {
-        fileContent = fileContent.replace(/\n/g, '\r\n');
-      }
-
-      // 尽量保持字节一致：如果原文件带 BOM，则写回时也带 BOM
-      if (currentFile.hasBom && fileContent.charCodeAt(0) !== 0xFEFF) {
-        fileContent = `\uFEFF${fileContent}`;
-      }
+      const prepared = prepareDocumentSave(currentFile);
 
       await invokeTauri('write_file', {
         path: currentFile.path,
-        content: fileContent,
+        content: prepared.fileContent,
       });
 
-      // 保存后刷新当前文件的 frontmatterBlock（后续正文改动继续“原样保存”）
-      const reparsed = parseMarkdownContent(fileContent, currentFile.type);
-      const nextFrontmatterBlock = reparsed.hasFrontmatter ? reparsed.frontmatterBlock ?? undefined : undefined;
-      const nextFrontmatterRaw = reparsed.hasFrontmatter ? reparsed.frontmatterRaw : undefined;
-
       set({
-        currentFile: {
-          ...currentFile,
-          isDirty: false,
-          metadataDirty: false,
-          hasFrontmatter: reparsed.hasFrontmatter,
-          frontmatterBlock: nextFrontmatterBlock,
-          frontmatterRaw: nextFrontmatterRaw,
-        },
+        currentFile: prepared.nextFile,
         isLoading: false,
       });
     } catch (error) {

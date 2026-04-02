@@ -5,6 +5,7 @@ import { invokeTauri } from '@/platform/tauri';
 import { buildDiaryEntryId, inferDiaryFromFileName, resolveDiaryDate } from '@/services/diary';
 import { parseMarkdownContent, extractGraphFromContent, parseRoadmapItemsFromContent } from '@/services/contentParser';
 import { collectLeafFilesByType, isSamePath } from '@/utils';
+import { DIARY_TIMELINE_LABEL } from '@/types';
 import { BackToTop } from './BackToTop';
 import type {
   DiaryMetadata,
@@ -619,7 +620,7 @@ function buildDiaryDay(date: string, entries: DiaryEntryMeta[]): DiaryDayMeta {
     latestEntry.excerpt ||
     sortedEntries.map((entry) => entry.excerpt).find(Boolean) ||
     '';
-  const title = sortedEntries.length === 1 ? sortedEntries[0].title : `${date} diary`;
+  const title = sortedEntries.length === 1 ? sortedEntries[0].title : `${date} 考研日志`;
 
   return {
     slug: date,
@@ -725,7 +726,7 @@ function DiaryTimelinePreview({ activeFile }: { activeFile: EditorFile }) {
     fileTreeVersion,
     loadData: loadDiaryTimelineDays,
     emptyValue: emptyDiaryTimelineDays,
-    errorLabel: '加载 diary 时间线',
+    errorLabel: '加载考研日志时间线',
   });
 
   const years = useMemo(() => {
@@ -773,7 +774,7 @@ function DiaryTimelinePreview({ activeFile }: { activeFile: EditorFile }) {
   return (
     <div className="max-w-4xl mx-auto px-6 py-12">
       <header className="mb-8">
-        <h1 className="text-2xl font-bold">日记时间线</h1>
+        <h1 className="text-2xl font-bold">{DIARY_TIMELINE_LABEL}</h1>
         <p className="text-sm text-[var(--color-gray)] mt-2">
           列表页预览（对齐 JasBlog `/diary` 的年/月筛选与时间线卡片布局）
         </p>
@@ -835,7 +836,7 @@ function DiaryTimelinePreview({ activeFile }: { activeFile: EditorFile }) {
                           <div className="flex flex-wrap items-center gap-2 mb-2">
                             <time className="text-xs text-[var(--color-gray-light)]">{day.date}</time>
                             <span className="text-xs px-2 py-0.5 rounded bg-[var(--color-paper-dark)] text-[var(--color-gray)]">
-                              {day.entryCount} entries
+                              {day.entryCount} 条记录
                             </span>
                             {day.mood && <span className="tag">{day.mood}</span>}
                             {day.weather && <span className="tag">{day.weather}</span>}
@@ -871,13 +872,13 @@ function DiaryTimelinePreview({ activeFile }: { activeFile: EditorFile }) {
                 </div>
               ) : (
                 <p className="text-[var(--color-gray)] text-center py-16">
-                  当前筛选条件下没有日记条目。
+                  当前筛选条件下没有考研日志条目。
                 </p>
               )}
             </>
           ) : (
             <div className="text-center py-16">
-              <p className="text-[var(--color-gray)]">暂无日记条目。</p>
+              <p className="text-[var(--color-gray)]">暂无考研日志条目。</p>
               <p className="text-sm text-[var(--color-gray)] mt-2">
                 将 Markdown 文件放入 <span className="font-mono">content/diary/YYYY/MM</span> 即可展示
               </p>

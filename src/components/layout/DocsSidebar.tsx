@@ -1,8 +1,8 @@
 import { useState } from 'react';
-import { useFileStore, useEditorStore } from '@/store';
+import { createDocumentResourceRef } from '@/agent/documentQueries';
+import { useFileStore, useEditorStore, useAgentStore } from '@/store';
 import { DocsTreeItem } from './DocsTreeItem';
 import type { FileTreeNode } from '@/store/fileStore';
-import { confirmDialog } from '@/utils/confirmDialog';
 import { renameSiblingPath } from '@/utils';
 import { FileContextMenu } from './sidebar/FileContextMenu';
 import { RenameDialog } from './sidebar/RenameDialog';
@@ -15,8 +15,9 @@ interface ContextMenuState {
 }
 
 export function DocsSidebar() {
-  const { fileTree, refreshFileTree } = useFileStore();
-  const { currentFile, deleteFile, renameFile } = useEditorStore();
+  const { fileTree, refreshFileTree, workspacePath, workspaceType } = useFileStore();
+  const { currentFile, renameFile } = useEditorStore();
+  const deleteWorkspaceDocument = useAgentStore((state) => state.deleteWorkspaceDocument);
   const [contextMenu, setContextMenu] = useState<ContextMenuState>({ visible: false, x: 0, y: 0, file: null });
   const [renameDialog, setRenameDialog] = useState<{ visible: boolean; file: FileTreeNode | null; newName: string }>({ visible: false, file: null, newName: '' });
 
@@ -43,17 +44,18 @@ export function DocsSidebar() {
     if (!file) return;
 
     setContextMenu((prev) => ({ ...prev, visible: false }));
-    const confirmed = await confirmDialog(`确定要删除 "${file.name}" 吗?`, {
-      title: '删除文件',
-      kind: 'warning',
-      okLabel: '删除',
-      cancelLabel: '取消',
-    });
-    if (!confirmed) return;
 
     try {
-      await deleteFile(file.path);
-      await refreshFileTree();
+      await deleteWorkspaceDocument(
+        createDocumentResourceRef({
+          path: file.path,
+          name: file.name,
+          contentType: file.contentType,
+          workspacePath,
+          workspaceType,
+        }),
+        'user:sidebar'
+      );
     } catch (error) {
       // 错误已在 store 中处理
     }

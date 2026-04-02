@@ -170,7 +170,7 @@ const tabSectionMap: Record<HelpTabId, { id: string; title: string }[]> = {
     { id: 'frontmatter-support', title: '说明' },
     { id: 'frontmatter-fields', title: '字段矩阵速查' },
     { id: 'frontmatter-note', title: 'note 示例' },
-    { id: 'frontmatter-diary', title: 'diary 示例' },
+    { id: 'frontmatter-diary', title: 'diary / 考研日志 示例' },
     { id: 'frontmatter-project', title: 'project 示例' },
     { id: 'frontmatter-roadmap', title: 'roadmap 示例' },
     { id: 'frontmatter-graph', title: 'graph 示例' },
@@ -368,8 +368,8 @@ export function HelpModal({ open, onClose }: HelpModalProps) {
       '| 类型 | 必填字段 | 可选字段 | 默认/回退行为 |',
       '| --- | --- | --- | --- |',
       '| note | `title` | `date/excerpt/tags` | `date` 默认为当天 |',
-      '| project | `name/description/github` | `demo/date/tags/techStack/status` | `status` 非法值回退 `active` |',
-      '| diary | `title/date` | `time/excerpt/tags/mood/weather/location/companions` | `time` 缺失时回退 `00:00` |',
+      '| project | `name/description/github` | `demo/date/tags/techStack` | 缺失时按字段默认空值处理 |',
+      '| diary（考研日志） | `title/date` | `time/excerpt/tags/mood/weather/location/companions` | `time` 缺失时回退 `00:00` |',
       '| roadmap | `title/description` | `date/status` | `status` 非法值回退 `active` |',
       '| graph | `name` | `description/date` | 若无 `name` 会尝试读取 `title` |',
       '| doc | 无强制 | `title/date` | 无 frontmatter 也可渲染正文 |',
@@ -475,24 +475,28 @@ export function HelpModal({ open, onClose }: HelpModalProps) {
 
     const diaryRaw = [
       '---',
-      'title: Morning Session',
+      'title: 政治晨读记录',
       'date: 2026-02-18',
       'time: 09:00',
-      'excerpt: 第一条日记，用于验证 Diary 渲染',
-      'tags: [diary, showcase]',
+      'excerpt: 记录今天的政治晨读安排、完成情况与复盘',
+      'tags: [考研, 政治]',
       'mood: focused',
       'weather: clear',
       'location: home desk',
       'companions: [solo]',
       '---',
       '',
-      '## Morning Goal',
+      '## 今日目标',
+      '',
+      '- 完成政治马原第一章晨读',
+      '',
+      '## 问题复盘',
       '',
       '> [!TIP]',
-      '> Diary 也支持 Alert / 表格 / 代码块。',
+      '> 考研日志也支持 Alert / 表格 / 代码块。',
       '',
       '```js',
-      'console.log(\"hello diary\");',
+      'console.log(\"review complete\");',
       '```',
     ].join('\n');
 
@@ -503,7 +507,6 @@ export function HelpModal({ open, onClose }: HelpModalProps) {
       'github: https://github.com/your/repo',
       'demo: https://example.com',
       'tags: [tauri, react]',
-      'status: active',
       'techStack:',
       '  - name: React',
       '    icon: React',
@@ -929,7 +932,7 @@ export function HelpModal({ open, onClose }: HelpModalProps) {
 	            />
 
             <SideBySideExample
-              title="diary（日记）"
+              title="diary（考研日志）"
               description="字段：title/date/time/excerpt/tags/mood/weather/location/companions"
               code={diaryRaw}
 	              preview={
@@ -950,7 +953,7 @@ export function HelpModal({ open, onClose }: HelpModalProps) {
 
             <SideBySideExample
               title="project（项目）"
-              description="字段：name/description/github/demo/tags/techStack/status（兼容 title 作为回退）"
+              description="字段：name/description/github/demo/tags/techStack（兼容 title 作为回退）"
               code={projectRaw}
 	              preview={
 	                <div className="max-h-[520px] overflow-auto">
@@ -1009,7 +1012,6 @@ export function HelpModal({ open, onClose }: HelpModalProps) {
                 <li>无 frontmatter 时会自动生成类型默认元数据，不影响正文编辑与预览。</li>
                 <li>YAML 语法错误时会回退到默认元数据，但正文会继续保留并正常渲染。</li>
                 <li>仅修改正文时会原样保留 frontmatter；修改元数据字段后会尽量在原 frontmatter 上做“增量更新”（未知字段/顺序/大部分注释可保留，但被修改字段的格式仍可能变化）。</li>
-                <li><code className="font-mono">project.status</code> 仅支持 <code className="font-mono">active/archived/wip</code>，非法值回退 <code className="font-mono">active</code>。</li>
                 <li><code className="font-mono">roadmap.status</code> 仅支持 <code className="font-mono">active/completed/paused</code>，非法值回退 <code className="font-mono">active</code>。</li>
                 <li><code className="font-mono">graph</code> 类型优先读取 <code className="font-mono">name</code>，缺失时会回退读取 <code className="font-mono">title</code>。</li>
               </ul>

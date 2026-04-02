@@ -1,7 +1,6 @@
 import { useState, useEffect, lazy, Suspense } from 'react';
-import { useSettingsStore, useFileStore, useEditorStore, useWindowStore, useTemplateStore } from '@/store';
+import { useSettingsStore, useFileStore, useEditorStore, useAgentStore, useWindowStore, useTemplateStore } from '@/store';
 import { openFolderDialog } from '@/platform/tauri';
-import { confirmDialog } from '@/utils/confirmDialog';
 import { applyTheme, getEffectiveTheme } from '@/utils';
 import type { ThemeMode } from '@/types';
 import type { JasBlogContentType } from '@/types';
@@ -28,9 +27,10 @@ export function Toolbar() {
     clearError: clearSettingsError,
   } = useSettingsStore();
   const { workspacePath, workspaceType, refreshFileTree, initWorkspace } = useFileStore();
+  const deleteWorkspaceDocument = useAgentStore((state) => state.deleteWorkspaceDocument);
+  const saveActiveDocument = useAgentStore((state) => state.saveActiveDocument);
   const {
     currentFile,
-    saveFile,
     viewMode,
     setViewMode,
     previewMode,
@@ -42,7 +42,6 @@ export function Toolbar() {
     openFile,
     createFolder,
     createNewFile,
-    deleteFile,
     aiPanelVisible,
     toggleAIPanel,
   } = useEditorStore();
@@ -129,8 +128,7 @@ export function Toolbar() {
   const handleSave = async () => {
     if (currentFile && currentFile.isDirty) {
       try {
-        await saveFile();
-        await refreshFileTree();
+        await saveActiveDocument('user:toolbar');
       } catch (error) {
         // 错误已在 store 中处理
       }
@@ -171,18 +169,20 @@ export function Toolbar() {
 
   const handleDelete = async () => {
     if (!currentFile) return;
-    const file = currentFile;
-    const confirmed = await confirmDialog(`确定要删除 "${file.name}" 吗?`, {
-      title: '删除文件',
-      kind: 'warning',
-      okLabel: '删除',
-      cancelLabel: '取消',
-    });
-    if (!confirmed) return;
 
     try {
-      await deleteFile(file.path);
-      await refreshFileTree();
+      await deleteWorkspaceDocument(
+        {
+          type: 'workspace_document',
+          id: currentFile.path.replace(/\\/g, '/').toLowerCase(),
+          path: currentFile.path,
+          name: currentFile.name,
+          contentType: currentFile.type,
+          workspacePath,
+          workspaceType,
+        },
+        'user:toolbar'
+      );
     } catch (error) {
       // 错误已在 store 中处理
     }
