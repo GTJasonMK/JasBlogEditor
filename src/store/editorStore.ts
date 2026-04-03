@@ -1,9 +1,9 @@
 import { create } from 'zustand';
 import { invokeTauri } from '@/platform/tauri';
-import { inferDiaryFromFileName } from '@/services/diary';
 import {
   parseMarkdownContent,
 } from '@/services/contentParser';
+import { normalizeEditorMetadata } from '@/services/editorMetadata';
 import {
   buildDocFilePath,
   buildDocFolderPath,
@@ -18,14 +18,6 @@ type Metadata = NoteMetadata | ProjectMetadata | DiaryMetadata | RoadmapMetadata
 
 export type EditorViewMode = 'edit' | 'preview' | 'split';
 export type PreviewMode = 'detail' | 'list';
-
-function getLocalDateString(): string {
-  const now = new Date();
-  const year = now.getFullYear();
-  const month = String(now.getMonth() + 1).padStart(2, '0');
-  const day = String(now.getDate()).padStart(2, '0');
-  return `${year}-${month}-${day}`;
-}
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null;
@@ -118,32 +110,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
 
       // 所有类型都使用 Markdown 解析
       const parsed = parseMarkdownContent(content, type);
-      let metadata = parsed.metadata as Metadata;
-
-      if (type === 'diary') {
-        const inferred = inferDiaryFromFileName(name.replace(/\.md$/i, ''));
-        const today = getLocalDateString();
-
-        const diary = metadata as DiaryMetadata;
-        // 无 frontmatter 时，parseMarkdownContent 会给 diary 提供默认 date/time；
-        // 这里优先使用文件名推断，避免把“今天/00:00”错误写回历史日记文件。
-        const preferInferred = !parsed.hasFrontmatter;
-        const resolvedDate = preferInferred
-          ? (inferred?.date || diary.date || today)
-          : (diary.date || inferred?.date || today);
-        const resolvedTime = preferInferred
-          ? (inferred?.time || diary.time || '00:00')
-          : (diary.time || inferred?.time || '00:00');
-
-        metadata = {
-          ...diary,
-          title: diary.title || inferred?.title || name.replace(/\.md$/i, ''),
-          date: resolvedDate,
-          time: resolvedTime,
-          tags: diary.tags || [],
-          companions: diary.companions || [],
-        };
-      }
+      const metadata = normalizeEditorMetadata(name, type, parsed.metadata as Metadata) as Metadata;
 
       set({
         currentFile: {

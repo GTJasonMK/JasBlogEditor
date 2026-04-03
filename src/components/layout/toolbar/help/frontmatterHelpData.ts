@@ -25,11 +25,11 @@ export interface FrontmatterHelpExample {
 export const FRONTMATTER_FIELD_TABLE = [
   "| 类型 | 必填字段 | 可选字段 | 默认/回退行为 |",
   "| --- | --- | --- | --- |",
-  "| note | `title` | `date/excerpt/tags` | `date` 默认为当天 |",
-  "| project | `name/description/github` | `demo/date/tags/techStack` | 缺失时按字段默认空值处理 |",
-  "| diary（考研日志） | `title/date` | `time/excerpt/tags/mood/weather/location/companions` | `time` 缺失时回退 `00:00` |",
-  "| roadmap | `title/description` | `date/status` | `status` 非法值回退 `active` |",
-  "| graph | `name` | `description/date` | 若无 `name` 会尝试读取 `title` |",
+  "| note | 无强制 | `title/date/excerpt/tags` | `title` 为空时回退 slug，`date` 可留空 |",
+  "| project | 无强制 | `name/description/github/demo/date/tags/techStack` | `name` 为空时回退 slug，空白描述/链接按缺失处理 |",
+  "| diary（考研日志） | 无强制 | `title/date/time/excerpt/tags/mood/weather/location/companions` | 可从文件名推断 `title/date/time`；详情页时间缺失时显示 `00:00` |",
+  "| roadmap | 无强制 | `title/description/date/status` | `title` 为空时回退 slug；非法 `status` 会报错并按 `active` 处理 |",
+  "| graph | 无强制 | `name/description/date` | `name` 会依次回退 `title` 和 slug；graph 块错误会单独显示 |",
   "| doc | 无强制 | `title/date` | 无 frontmatter 也可渲染正文 |",
   "",
   "保存策略：仅正文改动时会尽量原样保留 frontmatter（包含注释/缩进/空行）。",
@@ -45,8 +45,8 @@ export const FRONTMATTER_WRITING_RULES = [
 ];
 
 export const FRONTMATTER_FAQ = [
-  "无 frontmatter 时会自动生成类型默认元数据，不影响正文编辑与预览。",
-  "YAML 语法错误时会回退到默认元数据，但正文会继续保留并正常渲染。",
+  "无 frontmatter 也能继续编辑与预览；标题、日期等展示按各类型的 fallback 规则处理。",
+  "YAML 语法错误会显式暴露为 issue / 错误提示，正文仍会保留并继续渲染。",
   "仅修改正文时会原样保留 frontmatter；修改元数据字段后会尽量在原 frontmatter 上做增量更新。",
   "`roadmap.status` 仅支持 `active/completed/paused`，非法值回退 `active`。",
   "`graph` 类型优先读取 `name`，缺失时会回退读取 `title`。",
@@ -175,7 +175,7 @@ export const FRONTMATTER_HELP_EXAMPLES: FrontmatterHelpExample[] = [
     suitableFor:
       "当文档要被项目列表和详情页同时消费时，project 应该优先突出“这个项目是什么、解决什么问题、怎么试用”。",
     commonPatterns: [
-      "frontmatter 里的 `name/description/github` 决定卡片与头部信息，必须写得简洁、可读。",
+      "frontmatter 里的 `name/description/github` 会影响卡片与头部信息，建议写得简洁、可读。",
       "正文第一段先说明项目定位，避免一上来堆实现细节或开发故事。",
       "功能亮点用列表最清晰；技术栈放在 `techStack`，不要在正文重复罗列一遍相同信息。",
     ],

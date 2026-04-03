@@ -11,6 +11,7 @@ import {
   resolveProjectDisplay,
   resolveRoadmapDisplay,
 } from '@/services/displayMetadata';
+import { readFrontmatterString } from '@/services/frontmatter';
 import { isPublishableJasBlogPath } from '@/services/jasblogContentPolicy';
 import { combineIssueMessages } from '@/services/previewIssues';
 import { collectLeafFilesByType, isSamePath } from '@/utils';
@@ -474,7 +475,7 @@ function ProjectsListPreview({ activeFile }: { activeFile: EditorFile }) {
       path: activePath,
       slug: activeSlug,
       name: display.name,
-      description: activeMeta.description || '',
+      description: readFrontmatterString(activeMeta.description) ?? '',
       date: display.date,
       tags: activeMeta.tags || [],
       techStack: activeMeta.techStack || [],
@@ -494,7 +495,7 @@ function ProjectsListPreview({ activeFile }: { activeFile: EditorFile }) {
           path: node.path,
           slug,
           name: display.name,
-          description: meta.description || '',
+          description: readFrontmatterString(meta.description) ?? '',
           date: display.date,
           tags: meta.tags || [],
           techStack: meta.techStack || [],

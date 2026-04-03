@@ -62,6 +62,18 @@ test('diary 详情预览会暴露按天聚合错误和单条 entry 错误', () =
   assert.match(diarySource, /entry\.error/);
 });
 
+test('project 详情和列表预览会对 description/github/demo 做非空字符串归一化', () => {
+  const projectPreviewSource = readRepoFile('src/components/preview/previews/ProjectPreview.tsx');
+  const listSource = readRepoFile('src/components/preview/JasBlogListPreview.tsx');
+
+  assert.match(projectPreviewSource, /readFrontmatterString\(/);
+  assert.doesNotMatch(projectPreviewSource, /metadata\.github &&/);
+  assert.doesNotMatch(projectPreviewSource, /metadata\.demo &&/);
+  assert.doesNotMatch(projectPreviewSource, /text=\{metadata\.description\}/);
+  assert.match(listSource, /readFrontmatterString\(activeMeta\.description\)/);
+  assert.match(listSource, /readFrontmatterString\(meta\.description\)/);
+});
+
 test('编辑器表单不再把站点可 fallback 字段标为必填，也不做绝对 URL 校验', () => {
   const noteForm = readRepoFile('src/components/forms/NoteMetaForm.tsx');
   const diaryForm = readRepoFile('src/components/forms/DiaryMetaForm.tsx');

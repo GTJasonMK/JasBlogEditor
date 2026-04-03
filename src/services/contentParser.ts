@@ -21,14 +21,6 @@ import type {
 } from '@/types';
 import { readFrontmatterString } from './frontmatter';
 
-function getLocalDateString(): string {
-  const now = new Date();
-  const year = now.getFullYear();
-  const month = String(now.getMonth() + 1).padStart(2, '0');
-  const day = String(now.getDate()).padStart(2, '0');
-  return `${year}-${month}-${day}`;
-}
-
 /**
  * 解析 Markdown 内容
  * 从 raw 文本中提取 YAML frontmatter 和正文内容
@@ -72,7 +64,7 @@ export function parseMarkdownContent(
   } catch (error) {
     console.error('YAML 解析失败:', error);
     return {
-      metadata: getDefaultMetadata(type),
+      metadata: getFrontmatterErrorMetadata(type),
       issues: [`${type} frontmatter YAML 解析失败：${getErrorMessage(error)}`],
       frontmatterRaw: {},
       frontmatterBlock,
@@ -216,8 +208,7 @@ function normalizeTechStack(value: unknown): TechStackItem[] | undefined {
   return value
     .map((item): TechStackItem | null => {
       if (typeof item === 'string') {
-        const name = item.trim();
-        return name ? { name } : null;
+        return item ? { name: item } : null;
       }
 
       if (typeof item !== 'object' || item === null) {
@@ -230,8 +221,8 @@ function normalizeTechStack(value: unknown): TechStackItem[] | undefined {
 
       return {
         name,
-        icon: obj.icon ? String(obj.icon) : undefined,
-        color: obj.color ? String(obj.color) : undefined,
+        icon: typeof obj.icon === 'string' ? obj.icon : undefined,
+        color: typeof obj.color === 'string' ? obj.color : undefined,
       };
     })
     .filter((item): item is TechStackItem => item !== null);
@@ -321,8 +312,8 @@ export function parseRoadmapItemsFromContent(content: string): { items: RoadmapI
 
   // 任务行正则：- [ ] 或 - [-] 或 - [x] 开头，后面是标题，可选 `priority`
   const taskRegex = /^[-*+]\s*\[([ xX\-])\]\s+(.+?)(?:\s+`(high|medium|low)`)?\s*$/;
-  // 缩进行正则（至少2个空格或1个 Tab）
-  const indentRegex = /^(?:\t| {2,})(.+)$/;
+  // 缩进行正则（至少两个空白字符；与 JasBlog 站点端保持一致）
+  const indentRegex = /^(\s{2,})(.+)$/;
   // 截止日期正则
   const deadlineRegex = /^截止[:：]\s*(.+)$/;
   // 完成日期正则
@@ -400,7 +391,7 @@ export function parseRoadmapItemsFromContent(content: string): { items: RoadmapI
       // 当前有任务，检查是否是缩进的描述行
       const indentMatch = line.match(indentRegex);
       if (indentMatch) {
-        const text = indentMatch[1];
+        const text = indentMatch[2];
         const deadlineMatch = text.match(deadlineRegex);
         const completedAtMatch = text.match(completedAtRegex);
 
@@ -742,8 +733,6 @@ export function serializeGraphToContent(
  * 获取默认元数据
  */
 function getDefaultMetadata(type: ContentType): NoteMetadata | ProjectMetadata | DiaryMetadata | RoadmapMetadata | GraphMetadata | DocMetadata {
-  const today = getLocalDateString();
-
   if (type === 'note') {
     return {
       title: '',
@@ -765,8 +754,8 @@ function getDefaultMetadata(type: ContentType): NoteMetadata | ProjectMetadata |
   if (type === 'diary') {
     return {
       title: '',
-      date: today,
-      time: '00:00',
+      date: '',
+      time: '',
       excerpt: '',
       tags: [],
       companions: [],
@@ -794,6 +783,12 @@ function getDefaultMetadata(type: ContentType): NoteMetadata | ProjectMetadata |
     title: '',
     date: undefined,
   };
+}
+
+function getFrontmatterErrorMetadata(
+  type: ContentType
+): NoteMetadata | ProjectMetadata | DiaryMetadata | RoadmapMetadata | GraphMetadata | DocMetadata {
+  return getDefaultMetadata(type);
 }
 
 function getErrorMessage(error: unknown): string {

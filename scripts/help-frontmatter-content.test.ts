@@ -1,6 +1,8 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import {
+  FRONTMATTER_FAQ,
+  FRONTMATTER_FIELD_TABLE,
   FRONTMATTER_HELP_EXAMPLES,
   FRONTMATTER_SECTION_LINKS,
   FRONTMATTER_WRITING_RULES,
@@ -52,4 +54,15 @@ test("frontmatter 帮助示例覆盖各类型最常见写法", () => {
   assert.doesNotMatch(roadmap.raw, /- \[ \] `high`/);
   assert.match(graph.raw, /```graph/);
   assert.match(doc.raw, /## 操作步骤/);
+});
+
+test("frontmatter 帮助文案描述的是当前真实契约，而不是旧的必填/默认日期规则", () => {
+  assert.doesNotMatch(FRONTMATTER_FIELD_TABLE, /date` 默认为当天/);
+  assert.doesNotMatch(FRONTMATTER_FIELD_TABLE, /`name\/description\/github`/);
+  assert.doesNotMatch(FRONTMATTER_FIELD_TABLE, /\| diary（考研日志） \| `title\/date` \|/);
+  assert.match(FRONTMATTER_FIELD_TABLE, /\| note \| 无强制 \|/);
+  assert.match(FRONTMATTER_FIELD_TABLE, /\| project \| 无强制 \|/);
+  assert.match(FRONTMATTER_FIELD_TABLE, /\| diary（考研日志） \| 无强制 \|/);
+  assert.match(FRONTMATTER_FAQ.join("\n"), /YAML 语法错误会显式暴露/);
+  assert.doesNotMatch(FRONTMATTER_FAQ.join("\n"), /回退到默认元数据/);
 });

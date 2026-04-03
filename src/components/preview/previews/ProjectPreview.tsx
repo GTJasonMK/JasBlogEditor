@@ -1,5 +1,6 @@
 import type { ProjectMetadata } from '@/types';
 import { resolveProjectDisplay } from '@/services/displayMetadata';
+import { readFrontmatterString } from '@/services/frontmatter';
 import { MarkdownRenderer } from '../MarkdownRenderer';
 import { TechStack } from '../TechStack';
 import { BackToTop } from '../BackToTop';
@@ -16,6 +17,9 @@ interface ProjectPreviewProps {
 // 开源项目预览（与 JasBlog projects/[slug]/page.tsx 一致）
 export function ProjectPreview({ fileName, metadata, content, embedded = false }: ProjectPreviewProps) {
   const display = resolveProjectDisplay(fileName, metadata);
+  const description = readFrontmatterString(metadata.description);
+  const github = readFrontmatterString(metadata.github);
+  const demo = readFrontmatterString(metadata.demo);
 
   return (
     <div className="max-w-4xl mx-auto px-6 py-12">
@@ -26,13 +30,13 @@ export function ProjectPreview({ fileName, metadata, content, embedded = false }
       {/* 项目头部 */}
       <header className="mb-8">
         <h1 className="text-3xl font-bold mb-4">{display.name}</h1>
-        <PreviewDescription text={metadata.description} className="text-lg text-[var(--color-gray)] mb-4" />
+        <PreviewDescription text={description} className="text-lg text-[var(--color-gray)] mb-4" />
 
         {/* 链接按钮 */}
         <div className="flex flex-wrap gap-3 mb-6">
-          {metadata.github && (
+          {github && (
             <a
-              href={metadata.github}
+              href={github}
               target="_blank"
               rel="noopener noreferrer"
               className="inline-flex items-center gap-2 px-4 py-2 bg-[var(--color-ink)] text-white rounded-lg hover:opacity-90 transition-opacity"
@@ -43,9 +47,9 @@ export function ProjectPreview({ fileName, metadata, content, embedded = false }
               GitHub
             </a>
           )}
-          {metadata.demo && (
+          {demo && (
             <a
-              href={metadata.demo}
+              href={demo}
               target="_blank"
               rel="noopener noreferrer"
               className="inline-flex items-center gap-2 px-4 py-2 border border-[var(--color-vermilion)] text-[var(--color-vermilion)] rounded-lg hover:bg-[var(--color-vermilion)] hover:text-white transition-colors"
@@ -60,7 +64,7 @@ export function ProjectPreview({ fileName, metadata, content, embedded = false }
           )}
         </div>
 
-        {!metadata.github && (
+        {!github && (
           <p className="mb-6 text-sm text-[var(--color-danger)]">
             缺少 GitHub 地址，发布页不会显示 GitHub 按钮。
           </p>

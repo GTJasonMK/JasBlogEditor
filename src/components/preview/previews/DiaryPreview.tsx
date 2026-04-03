@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { invokeTauri } from '@/platform/tauri';
 import { buildDiaryEntryId, DIARY_DATE_PATTERN, type DiaryNameInference, inferDiaryFromFileName, resolveDiaryDate } from '@/services/diary';
 import { parseMarkdownContent } from '@/services/contentParser';
+import { resolveDiaryDisplay } from '@/services/displayMetadata';
 import { combineIssueMessages } from '@/services/previewIssues';
 import { useFileStore } from '@/store';
 import { collectLeafFiles, isSamePath } from '@/utils';
@@ -102,11 +103,11 @@ export function DiaryPreview({ filePath, fileName, metadata, content, aggregateB
 
   const fileBaseName = useMemo(() => fileName.replace(/\.md$/i, ''), [fileName]);
   const inferred = useMemo(() => inferDiaryFromFileName(fileBaseName), [fileBaseName]);
-
-  const resolvedDate = useMemo(
-    () => resolveDiaryDate(metadata.date, inferred?.date),
-    [metadata.date, inferred?.date]
+  const display = useMemo(
+    () => resolveDiaryDisplay(fileName, metadata, inferred),
+    [fileName, metadata, inferred]
   );
+  const resolvedDate = display.date;
 
   const diaryDirPath = useMemo(() => {
     if (!workspacePath) return null;
@@ -114,16 +115,12 @@ export function DiaryPreview({ filePath, fileName, metadata, content, aggregateB
   }, [workspacePath]);
 
   const currentEntry: DiaryEntry = useMemo(() => {
-    const title = metadata.title || inferred?.title || fileBaseName;
-    const date = resolvedDate || metadata.date || inferred?.date || '';
-    const time = metadata.time || inferred?.time || '00:00';
-
     return {
       id: diaryDirPath ? buildDiaryEntryId(filePath, diaryDirPath) : fileBaseName,
       path: filePath,
-      title,
-      date,
-      time,
+      title: display.title,
+      date: display.date,
+      time: display.time || '00:00',
       excerpt: metadata.excerpt || '',
       tags: metadata.tags || [],
       mood: metadata.mood,
@@ -133,23 +130,17 @@ export function DiaryPreview({ filePath, fileName, metadata, content, aggregateB
       content,
     };
   }, [
-    metadata.title,
-    metadata.date,
-    metadata.time,
     metadata.excerpt,
     metadata.tags,
     metadata.mood,
     metadata.weather,
     metadata.location,
     metadata.companions,
-    inferred?.title,
-    inferred?.date,
-    inferred?.time,
     fileBaseName,
     filePath,
     diaryDirPath,
     content,
-    resolvedDate,
+    display,
   ]);
 
   const [extraEntries, setExtraEntries] = useState<DiaryEntry[]>([]);
@@ -195,9 +186,9 @@ export function DiaryPreview({ filePath, fileName, metadata, content, aggregateB
           if (isSamePath(node.path, filePath)) return null;
           const inferred = inferDiaryFromFileName(baseName);
           if (inferred?.date && inferred.date !== resolvedDate) return null;
-          return { node, baseName, inferred };
+          return { node, inferred };
         })
-        .filter((item): item is { node: FileTreeNode; baseName: string; inferred: DiaryNameInference | null } => item !== null);
+        .filter((item): item is { node: FileTreeNode; inferred: DiaryNameInference | null } => item !== null);
 
       if (candidates.length === 0) {
         setExtraEntries([]);
@@ -208,25 +199,24 @@ export function DiaryPreview({ filePath, fileName, metadata, content, aggregateB
 
       try {
         const loaded = await Promise.all(
-          candidates.map(async ({ node, baseName, inferred }) => {
+          candidates.map(async ({ node, inferred }) => {
             const raw = await invokeTauri('read_file', { path: node.path });
             const parsed = parseMarkdownContent(raw, 'diary');
             const meta = parsed.metadata as DiaryMetadata;
 
             // frontmatter 日期无效时，回退到文件名推断日期，避免误丢可聚合条目
-            const date = resolveDiaryDate(meta.date, inferred?.date);
+            const entryDisplay = resolveDiaryDisplay(node.name, meta, inferred);
+            const date = resolveDiaryDate(entryDisplay.date, inferred?.date);
             if (date !== resolvedDate) return null;
 
-            const time = meta.time || inferred?.time || '00:00';
-            const title = meta.title || inferred?.title || baseName;
             const entryId = buildDiaryEntryId(node.path, diaryDirPath);
 
             const entry: DiaryEntry = {
               id: entryId,
               path: node.path,
-              title,
+              title: entryDisplay.title,
               date,
-              time,
+              time: entryDisplay.time || '00:00',
               excerpt: meta.excerpt || '',
               tags: meta.tags || [],
               mood: meta.mood,

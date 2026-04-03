@@ -11,7 +11,7 @@
     "build": "tsc -b && vite build",
     "build:app": "tauri build",
     "preview": "vite preview",
-    "test": "node --loader ./scripts/ts-loader.mjs --test scripts/dev-port.test.mjs scripts/document-agent-runtime.test.ts scripts/document-mcp-contract.test.ts scripts/diary-ui-labels.test.ts scripts/content-parity.test.ts scripts/display-metadata.test.ts scripts/preview-contract.test.ts scripts/ui-copy.test.ts scripts/global-shortcut-controller.test.ts scripts/workspace-initialization.test.ts scripts/help-frontmatter-content.test.ts scripts/example-preview-model.test.ts scripts/help-frontmatter-window-entry.test.ts scripts/example-preview-layout.test.ts",
+    "test": "node --loader ./scripts/ts-loader.mjs --test scripts/dev-port.test.mjs scripts/document-agent-runtime.test.ts scripts/document-mcp-contract.test.ts scripts/diary-ui-labels.test.ts scripts/diary-default-path.test.ts scripts/content-parity.test.ts scripts/display-metadata.test.ts scripts/preview-contract.test.ts scripts/ui-copy.test.ts scripts/global-shortcut-controller.test.ts scripts/workspace-initialization.test.ts scripts/help-frontmatter-content.test.ts scripts/example-preview-model.test.ts scripts/help-frontmatter-window-entry.test.ts scripts/example-preview-layout.test.ts scripts/alignment-followups.test.ts scripts/search-alignment.test.ts",
     "tauri": "node scripts/tauri.mjs"
   },
   "dependencies": {

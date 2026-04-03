@@ -5,6 +5,32 @@ export function supportsNestedJasBlogContent(contentType: JasBlogContentType): b
   return contentType === 'diary';
 }
 
+export function getJasBlogRelativePathError(
+  contentType: JasBlogContentType,
+  input: string
+): string | null {
+  const trimmed = input.trim();
+  if (!trimmed) {
+    return null;
+  }
+
+  const segments = trimmed
+    .replace(/^[\\/]+/, '')
+    .split(/[\\/]+/)
+    .map((segment) => segment.trim())
+    .filter(Boolean);
+
+  if (segments.some((segment) => segment === '.' || segment === '..')) {
+    return '路径不能包含 . 或 .. 段。';
+  }
+
+  if (!supportsNestedJasBlogContent(contentType) && segments.length > 1) {
+    return '该类型只支持一级文件名，不允许子目录。';
+  }
+
+  return null;
+}
+
 export function isPublishableJasBlogPath(
   workspacePath: string | null,
   filePath: string,

@@ -1,4 +1,4 @@
-import { lazy, Suspense, useEffect, useState } from 'react';
+import { lazy, Suspense } from 'react';
 import type { GraphData, NoteMetadata } from '@/types';
 import { resolveNoteDisplay } from '@/services/displayMetadata';
 import { useEditorStore } from '@/store';
@@ -8,7 +8,6 @@ const LazyGraphViewer = lazy(() => import('@/components/graph/GraphViewer'));
 import { MarkdownRenderer } from '../MarkdownRenderer';
 import { TableOfContents } from '../TableOfContents';
 import { BackToTop } from '../BackToTop';
-import { usePreviewScrollContainer } from '../PreviewScrollContext';
 import { Comments } from '../Comments';
 import { PreviewBackButton } from '../PreviewBackButton';
 import { PreviewDate, PreviewTagList } from '../PreviewMeta';
@@ -114,36 +113,8 @@ export function NotePreview({ fileName, metadata, content, embedded = false }: N
   const segments = parseContent(content);
   const display = resolveNoteDisplay(fileName, metadata);
 
-  const scrollContainer = usePreviewScrollContainer();
-  const [canShowToc, setCanShowToc] = useState(false);
-
-  // 目录只在主预览区域启用：需要 PreviewScrollProvider 提供滚动容器
-  useEffect(() => {
-    if (!scrollContainer) {
-      setCanShowToc(false);
-      return;
-    }
-
-    const update = () => {
-      // 经验阈值：容器宽度足够时再显示目录，避免分屏/迷你窗口挤占正文宽度
-      setCanShowToc(scrollContainer.clientWidth >= 900);
-    };
-
-    update();
-
-    let ro: ResizeObserver | null = null;
-    if (typeof ResizeObserver !== 'undefined') {
-      ro = new ResizeObserver(() => update());
-      ro.observe(scrollContainer);
-    }
-
-    return () => {
-      ro?.disconnect();
-    };
-  }, [scrollContainer]);
-
   const hasTocCandidates = hasVisibleTocHeadings(content);
-  const showToc = canShowToc && hasTocCandidates;
+  const showToc = hasTocCandidates;
 
   const slug = fileName.replace(/\.md$/i, '');
   const commentTerm = `/notes/${slug}`;

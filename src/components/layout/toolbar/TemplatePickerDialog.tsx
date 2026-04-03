@@ -1,6 +1,11 @@
 import { useState, useEffect } from 'react';
 import { useTemplateStore } from '@/store';
-import { getBuiltinTemplates, applyTemplateToFilename } from '@/services/contentTemplates';
+import {
+  getBuiltinTemplates,
+  applyTemplateToFilename,
+  buildDefaultDiaryRelativePath,
+} from '@/services/contentTemplates';
+import { getJasBlogRelativePathError } from '@/services/jasblogContentPolicy';
 import { CONTENT_TYPE_LABELS, DIARY_DISPLAY_LABEL } from '@/types';
 import type { BuiltinTemplate } from '@/services/contentTemplates';
 import type { JasBlogContentType, UserTemplate } from '@/types';
@@ -19,17 +24,19 @@ export function TemplatePickerDialog({ type, onConfirm, onCancel }: TemplatePick
 
   const builtins = getBuiltinTemplates(type);
   const userTemplatesOfType = userTemplates.filter((t) => t.type === type);
+  const pathError = getJasBlogRelativePathError(type, filename);
 
   // 默认选中第一个内置模板
   useEffect(() => {
     if (builtins.length > 0) {
       setSelectedId(builtins[0].id);
     }
+    setFilename(type === 'diary' ? buildDefaultDiaryRelativePath() : '');
   }, [type]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleConfirm = async () => {
     const trimmed = filename.trim();
-    if (!trimmed || !selectedId) return;
+    if (!trimmed || !selectedId || pathError) return;
 
     const builtin = builtins.find((t) => t.id === selectedId);
     const userTemplate = userTemplatesOfType.find((t) => t.id === selectedId);
@@ -80,6 +87,11 @@ export function TemplatePickerDialog({ type, onConfirm, onCancel }: TemplatePick
           autoFocus
           onKeyDown={handleKeyDown}
         />
+        {pathError && (
+          <p className="text-xs text-[var(--color-danger)] mb-3">
+            {pathError}
+          </p>
+        )}
         {type === 'diary' && (
           <p className="text-xs text-[var(--color-text-muted)] mb-3">
             {DIARY_DISPLAY_LABEL}建议使用 <span className="font-mono">YYYY/MM</span> 目录结构；目录不存在时会自动创建。
@@ -137,7 +149,7 @@ export function TemplatePickerDialog({ type, onConfirm, onCancel }: TemplatePick
           </button>
           <button
             onClick={handleConfirm}
-            disabled={!filename.trim() || !selectedId || isSubmitting}
+            disabled={Boolean(pathError) || !filename.trim() || !selectedId || isSubmitting}
             className="px-4 py-2 text-sm bg-[var(--color-primary)] text-white hover:bg-[var(--color-primary-dark)] disabled:opacity-50 rounded-md transition-colors"
           >
             创建

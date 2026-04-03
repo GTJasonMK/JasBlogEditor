@@ -182,6 +182,65 @@ demo:
   assert.equal(projectMetadata.demo, undefined);
 });
 
+test('prepareDocumentSave 会用重解析后的 project metadata 回写保存态，避免空白 CTA 字段残留在编辑器状态里', () => {
+  const prepared = prepareDocumentSave({
+    path: '/workspace/content/projects/contract.md',
+    name: 'contract.md',
+    type: 'project',
+    content: '正文\n',
+    metadata: {
+      name: '契约清理',
+      description: '   ',
+      github: '   ',
+      demo: '   ',
+      tags: [],
+      techStack: [],
+    },
+    issues: [],
+    metadataDirty: true,
+    isDirty: true,
+    hasFrontmatter: false,
+    hasBom: false,
+    lineEnding: 'lf',
+  } satisfies EditorFile);
+
+  assert.deepEqual(prepared.nextFile.metadata, {
+    name: '契约清理',
+    description: '',
+    github: '',
+    demo: undefined,
+    date: undefined,
+    tags: [],
+    techStack: [],
+  } satisfies ProjectMetadata);
+});
+
+test('project techStack 解析与 JasBlog 对齐，只接受字符串 icon/color，保留数组字符串项原值', () => {
+  const raw = `---
+name: JasBlogEditor
+techStack:
+  - " React "
+  - name: Tauri
+    icon: 1
+    color:
+      bad: 1
+  - name: TypeScript
+    icon: TS
+    color: "#3178C6"
+---
+
+正文
+`;
+
+  const parsed = parseMarkdownContent(raw, 'project');
+
+  assert.deepEqual((parsed.metadata as ProjectMetadata).techStack, [
+    { name: ' React ' },
+    { name: 'Tauri', icon: undefined, color: undefined },
+    { name: 'TypeScript', icon: 'TS', color: '#3178C6' },
+  ]);
+});
+
 test('预览错误合并会同时保留 frontmatter issues 和内容解析错误', () => {
   assert.equal(
     combineIssueMessages(['note frontmatter 错误'], 'graph 数据格式无效'),

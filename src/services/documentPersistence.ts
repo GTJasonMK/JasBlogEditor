@@ -3,8 +3,10 @@ import {
   serializeDocContentPreservingFrontmatter,
   serializeMarkdownContentPreservingFrontmatter,
 } from '@/services/contentParser';
+import { normalizeEditorMetadata } from '@/services/editorMetadata';
 import type {
   DiaryMetadata,
+  ContentType,
   DocMetadata,
   EditorFile,
   GraphMetadata,
@@ -69,11 +71,17 @@ export function prepareDocumentSave(currentFile: EditorFile): PreparedDocumentSa
   const reparsed = parseMarkdownContent(fileContent, currentFile.type);
   const nextFrontmatterBlock = reparsed.hasFrontmatter ? reparsed.frontmatterBlock ?? undefined : undefined;
   const nextFrontmatterRaw = reparsed.hasFrontmatter ? reparsed.frontmatterRaw : undefined;
+  const nextMetadata = normalizeEditorMetadata(
+    currentFile.name,
+    currentFile.type as ContentType,
+    reparsed.metadata as MarkdownMetadata | DocMetadata
+  );
 
   return {
     fileContent,
     nextFile: {
       ...currentFile,
+      metadata: nextMetadata,
       isDirty: false,
       metadataDirty: false,
       issues: reparsed.issues,

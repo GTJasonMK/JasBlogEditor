@@ -6,6 +6,7 @@
 
 import type { JasBlogContentType } from '@/types';
 import { CONTENT_DIRS } from '@/types';
+import { getJasBlogRelativePathError } from './jasblogContentPolicy';
 
 // ============================================
 // 内置模板注册表
@@ -657,6 +658,16 @@ function getToday(): string {
   return `${year}-${month}-${day}`;
 }
 
+export function buildDefaultDiaryRelativePath(date = new Date()): string {
+  const year = String(date.getFullYear());
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  const hour = String(date.getHours()).padStart(2, '0');
+  const minute = String(date.getMinutes()).padStart(2, '0');
+
+  return `${year}/${month}/${year}-${month}-${day}-${hour}-${minute}`;
+}
+
 function normalizeRelativePath(input: string): string {
   const trimmed = input.trim().replace(/^[\\/]+/, '');
   if (!trimmed) return '';
@@ -698,7 +709,17 @@ function normalizeTitleFromPath(input: string): string {
  * 构建 JasBlog 内容文件路径（content/<dir>/<filename>.md）
  */
 export function buildJasblogFilePath(workspacePath: string, type: JasBlogContentType, filename: string): string {
-  const baseName = normalizeBaseName(filename);
+  const trimmed = filename.trim();
+  if (!trimmed) {
+    throw new Error('文件名不能为空。');
+  }
+
+  const pathError = getJasBlogRelativePathError(type, trimmed);
+  if (pathError) {
+    throw new Error(pathError);
+  }
+
+  const baseName = normalizeBaseName(trimmed);
   const dir = CONTENT_DIRS[type];
   return `${workspacePath}/content/${dir}/${baseName}.md`;
 }
