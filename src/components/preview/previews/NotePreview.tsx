@@ -1,5 +1,6 @@
 import { lazy, Suspense, useEffect, useState } from 'react';
 import type { GraphData, NoteMetadata } from '@/types';
+import { resolveNoteDisplay } from '@/services/displayMetadata';
 import { useEditorStore } from '@/store';
 
 // @xyflow/react 很大，仅在笔记内容包含 ```graph 块时才加载
@@ -111,6 +112,7 @@ export function NotePreview({ fileName, metadata, content, embedded = false }: N
   const setPreviewMode = useEditorStore((state) => state.setPreviewMode);
   const setNotesListTag = useEditorStore((state) => state.setNotesListTag);
   const segments = parseContent(content);
+  const display = resolveNoteDisplay(fileName, metadata);
 
   const scrollContainer = usePreviewScrollContainer();
   const [canShowToc, setCanShowToc] = useState(false);
@@ -160,8 +162,8 @@ export function NotePreview({ fileName, metadata, content, embedded = false }: N
         <div className="min-w-0 flex-1 max-w-3xl">
           {/* 文章头部 */}
           <header className="mb-8">
-            <PreviewDate date={metadata.date} />
-            <h1 className="text-3xl font-bold mt-2 mb-4">{metadata.title}</h1>
+            <PreviewDate date={display.date} />
+            <h1 className="text-3xl font-bold mt-2 mb-4">{display.title}</h1>
             <PreviewTagList
               tags={metadata.tags}
               onTagClick={embedded ? undefined : handleTagClick}

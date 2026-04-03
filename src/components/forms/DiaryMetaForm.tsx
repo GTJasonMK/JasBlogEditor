@@ -9,47 +9,28 @@ export function DiaryMetaForm() {
 
   const metadata = currentFile.metadata as DiaryMetadata;
 
-  const isTitleEmpty = !metadata.title.trim();
-  const isDateEmpty = !metadata.date.trim();
-
   return (
     <div className="space-y-4">
       {/* 标题 */}
       <div>
-        <label className="block text-xs text-[var(--color-text-muted)] mb-1">
-          标题 <span className="text-[var(--color-danger)]">*</span>
-        </label>
+        <label className="block text-xs text-[var(--color-text-muted)] mb-1">标题</label>
         <input
           type="text"
           value={metadata.title}
           onChange={(e) => updateMetadata({ title: e.target.value })}
-          className={`w-full px-3 py-2 text-sm border rounded-md focus:outline-none focus:border-[var(--color-primary)] ${
-            isTitleEmpty ? 'border-[var(--color-danger)]' : 'border-[var(--color-border)]'
-          }`}
-          required
+          className="w-full px-3 py-2 text-sm border border-[var(--color-border)] rounded-md focus:outline-none focus:border-[var(--color-primary)]"
         />
-        {isTitleEmpty && (
-          <span className="text-xs text-[var(--color-danger)] mt-1">标题不能为空</span>
-        )}
       </div>
 
       {/* 日期 */}
       <div>
-        <label className="block text-xs text-[var(--color-text-muted)] mb-1">
-          日期 <span className="text-[var(--color-danger)]">*</span>
-        </label>
+        <label className="block text-xs text-[var(--color-text-muted)] mb-1">日期</label>
         <input
           type="date"
           value={metadata.date}
           onChange={(e) => updateMetadata({ date: e.target.value })}
-          className={`w-full px-3 py-2 text-sm border rounded-md focus:outline-none focus:border-[var(--color-primary)] ${
-            isDateEmpty ? 'border-[var(--color-danger)]' : 'border-[var(--color-border)]'
-          }`}
-          required
+          className="w-full px-3 py-2 text-sm border border-[var(--color-border)] rounded-md focus:outline-none focus:border-[var(--color-primary)]"
         />
-        {isDateEmpty && (
-          <span className="text-xs text-[var(--color-danger)] mt-1">日期不能为空</span>
-        )}
       </div>
 
       {/* 时间 */}

@@ -1,0 +1,135 @@
+<h2>独立示例窗口布局方案</h2>
+<p class="subtitle">目标：在编辑器内部打开一个新窗口，同时展示“原始文档”和“渲染结果”示例。</p>
+
+<div class="cards">
+  <div class="card" data-choice="a" onclick="toggleSelect(this)">
+    <div class="card-image">
+      <div class="mockup">
+        <div class="mockup-header">方案 A · 纯双栏</div>
+        <div class="mockup-body">
+          <div class="mock-nav">示例标题 | 类型标签 | 打开来源</div>
+          <div style="display:flex; gap:12px; margin-top:12px;">
+            <div class="mock-content" style="flex:1;">
+              原始文档
+              <div class="placeholder" style="margin-top:10px; min-height:180px;">frontmatter + Markdown</div>
+            </div>
+            <div class="mock-content" style="flex:1;">
+              渲染结果
+              <div class="placeholder" style="margin-top:10px; min-height:180px;">真实预览</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="card-body">
+      <h3>方案 A：纯双栏对照</h3>
+      <p>最直接。打开窗口后立刻左右对照，没有额外导航。</p>
+      <div class="pros-cons">
+        <div class="pros">
+          <h4>优点</h4>
+          <ul>
+            <li>心智负担最低</li>
+            <li>适合只看当前一个示例</li>
+          </ul>
+        </div>
+        <div class="cons">
+          <h4>缺点</h4>
+          <ul>
+            <li>切换不同示例不够顺手</li>
+            <li>扩展到多类型时会开始拥挤</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="card" data-choice="b" onclick="toggleSelect(this)">
+    <div class="card-image">
+      <div class="mockup">
+        <div class="mockup-header">方案 B · 侧栏 + 双栏主体</div>
+        <div class="mockup-body">
+          <div class="mock-nav">示例窗口 | note / diary / project</div>
+          <div style="display:flex; gap:12px; margin-top:12px;">
+            <div class="mock-sidebar" style="width:120px;">示例目录<br>写作提示<br>类型切换</div>
+            <div class="mock-content" style="flex:1;">
+              原始文档
+              <div class="placeholder" style="margin-top:10px; min-height:180px;">原文源码</div>
+            </div>
+            <div class="mock-content" style="flex:1;">
+              渲染结果
+              <div class="placeholder" style="margin-top:10px; min-height:180px;">真实渲染</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="card-body">
+      <h3>方案 B：侧栏导航 + 双栏主体</h3>
+      <p>推荐。左侧负责示例与类型切换，中间和右侧稳定做原文/渲染对照。</p>
+      <div class="pros-cons">
+        <div class="pros">
+          <h4>优点</h4>
+          <ul>
+            <li>适合多种文档示例</li>
+            <li>窗口结构稳定，扩展性最好</li>
+            <li>写作提示有自然落点</li>
+          </ul>
+        </div>
+        <div class="cons">
+          <h4>缺点</h4>
+          <ul>
+            <li>比方案 A 稍复杂</li>
+            <li>窗口宽度不足时要处理压缩</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="card" data-choice="c" onclick="toggleSelect(this)">
+    <div class="card-image">
+      <div class="mockup">
+        <div class="mockup-header">方案 C · 顶部标签 + 双栏 + 底部说明</div>
+        <div class="mockup-body">
+          <div class="mock-nav">note | diary | project | roadmap | graph | doc</div>
+          <div style="display:flex; gap:12px; margin-top:12px;">
+            <div class="mock-content" style="flex:1;">
+              原始文档
+              <div class="placeholder" style="margin-top:10px; min-height:150px;">源码</div>
+            </div>
+            <div class="mock-content" style="flex:1;">
+              渲染结果
+              <div class="placeholder" style="margin-top:10px; min-height:150px;">预览</div>
+            </div>
+          </div>
+          <div class="placeholder" style="margin-top:12px;">底部写作建议 / 字段说明</div>
+        </div>
+      </div>
+    </div>
+    <div class="card-body">
+      <h3>方案 C：顶部标签式</h3>
+      <p>更像文档中心。强调按类型切换，但窗口内部信息层级更多。</p>
+      <div class="pros-cons">
+        <div class="pros">
+          <h4>优点</h4>
+          <ul>
+            <li>类型切换明显</li>
+            <li>适合和帮助页风格统一</li>
+          </ul>
+        </div>
+        <div class="cons">
+          <h4>缺点</h4>
+          <ul>
+            <li>顶部和底部都占空间</li>
+            <li>核心对照区域容易被挤压</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="section">
+  <p class="label">我的建议</p>
+  <p>优先选 <strong>方案 B</strong>。它最适合你现在的需求：一个独立新窗口，既能稳定对照“原始文档 / 渲染结果”，又能容纳多个类别的示例文档和写作提示，不会很快长歪。</p>
+</div>

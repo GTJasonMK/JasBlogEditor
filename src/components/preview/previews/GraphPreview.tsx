@@ -1,6 +1,7 @@
 import { lazy, Suspense } from 'react';
 import type { GraphMetadata } from '@/types';
 import { extractGraphFromContent } from '@/services/contentParser';
+import { resolveGraphDisplay } from '@/services/displayMetadata';
 import { MarkdownRenderer } from '../MarkdownRenderer';
 import { PreviewBackButton } from '../PreviewBackButton';
 import { PreviewDescription, PreviewDate } from '../PreviewMeta';
@@ -9,15 +10,17 @@ import { PreviewDescription, PreviewDate } from '../PreviewMeta';
 const LazyGraphViewer = lazy(() => import('@/components/graph/GraphViewer'));
 
 interface GraphPreviewProps {
+  fileName: string;
   metadata: GraphMetadata;
   content: string;
   embedded?: boolean;
 }
 
 // 知识图谱预览（与 JasBlog graphs/[slug]/page.tsx 一致）
-export function GraphPreview({ metadata, content, embedded = false }: GraphPreviewProps) {
+export function GraphPreview({ fileName, metadata, content, embedded = false }: GraphPreviewProps) {
   // 从正文内容中提取图谱数据
   const { graphData, remainingContent, error } = extractGraphFromContent(content);
+  const display = resolveGraphDisplay(fileName, metadata);
 
   return (
     <div className="max-w-6xl mx-auto px-6 py-12">
@@ -27,10 +30,10 @@ export function GraphPreview({ metadata, content, embedded = false }: GraphPrevi
 
       {/* 标题 */}
       <header className="mb-8">
-        <h1 className="text-2xl font-bold mb-2">{metadata.name}</h1>
+        <h1 className="text-2xl font-bold mb-2">{display.name}</h1>
         <PreviewDescription text={metadata.description} className="text-[var(--color-gray)] mb-2" />
         <p className="text-sm text-[var(--color-gray)]">
-          <PreviewDate date={metadata.date} className="mr-4" />
+          <PreviewDate date={display.date} className="mr-4" />
           <span>{graphData.nodes.length} 个节点</span>
           <span className="mx-2">·</span>
           <span>{graphData.edges.length} 条连接</span>

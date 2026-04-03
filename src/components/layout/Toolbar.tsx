@@ -114,6 +114,9 @@ export function Toolbar() {
       });
       if (path) {
         const resolved = await initWorkspace(path);
+        if (!resolved.workspacePath || !resolved.workspaceType) {
+          return;
+        }
         await saveSettings({
           workspacePath: resolved.workspacePath,
           workspaceType: resolved.workspaceType,

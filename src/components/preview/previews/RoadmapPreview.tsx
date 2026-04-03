@@ -1,10 +1,12 @@
 import type { RoadmapMetadata, RoadmapItem } from '@/types';
 import { parseRoadmapItemsFromContent } from '@/services/contentParser';
+import { resolveRoadmapDisplay } from '@/services/displayMetadata';
 import { MarkdownRenderer } from '../MarkdownRenderer';
 import { PreviewBackButton } from '../PreviewBackButton';
 import { PreviewDescription } from '../PreviewMeta';
 
 interface RoadmapPreviewProps {
+  fileName: string;
   metadata: RoadmapMetadata;
   content: string;
   embedded?: boolean;
@@ -114,7 +116,7 @@ function RoadmapItemGroup({
 }
 
 // 规划预览（与 JasBlog roadmap/[slug]/page.tsx 一致）
-export function RoadmapPreview({ metadata, content, embedded = false }: RoadmapPreviewProps) {
+export function RoadmapPreview({ fileName, metadata, content, embedded = false }: RoadmapPreviewProps) {
   // 从正文内容解析任务列表和剩余内容
   const { items, remainingContent } = parseRoadmapItemsFromContent(content);
 
@@ -126,7 +128,8 @@ export function RoadmapPreview({ metadata, content, embedded = false }: RoadmapP
   const doneCount = done.length;
   const progressPercent = total > 0 ? Math.round((doneCount / total) * 100) : 0;
 
-  const roadmapStatus = metadata.status || 'active';
+  const display = resolveRoadmapDisplay(fileName, metadata);
+  const roadmapStatus = display.status;
   const roadmapStatusCfg = roadmapStatusConfig[roadmapStatus];
 
   return (
@@ -138,7 +141,7 @@ export function RoadmapPreview({ metadata, content, embedded = false }: RoadmapP
       {/* 标题区域 */}
       <header className="mb-8">
         <div className="flex items-center gap-3 mb-2">
-          <h1 className="text-2xl font-bold">{metadata.title}</h1>
+          <h1 className="text-2xl font-bold">{display.title}</h1>
           <span className={`text-xs px-2 py-1 rounded ${roadmapStatusCfg.className}`}>
             {roadmapStatusCfg.label}
           </span>

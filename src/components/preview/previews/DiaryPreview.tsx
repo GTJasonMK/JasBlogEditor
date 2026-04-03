@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { invokeTauri } from '@/platform/tauri';
 import { buildDiaryEntryId, DIARY_DATE_PATTERN, type DiaryNameInference, inferDiaryFromFileName, resolveDiaryDate } from '@/services/diary';
 import { parseMarkdownContent } from '@/services/contentParser';
+import { combineIssueMessages } from '@/services/previewIssues';
 import { useFileStore } from '@/store';
 import { collectLeafFiles, isSamePath } from '@/utils';
 import { DIARY_TIMELINE_LABEL, type DiaryMetadata } from '@/types';
@@ -32,6 +33,7 @@ interface DiaryEntry {
   location?: string;
   companions: string[];
   content: string;
+  error?: string;
 }
 
 interface DiaryDay {
@@ -45,6 +47,7 @@ interface DiaryDay {
   weather?: string;
   location?: string;
   entries: DiaryEntry[];
+  error?: string;
 }
 
 
@@ -74,6 +77,7 @@ function buildDiaryDay(date: string, entries: DiaryEntry[]): DiaryDay {
     latestEntry.excerpt ||
     sortedEntries.map((entry) => entry.excerpt).find(Boolean) ||
     '';
+  const error = sortedEntries.map((entry) => entry.error).find(Boolean);
   const title = sortedEntries.length === 1 ? sortedEntries[0].title : `${date} 考研日志`;
 
   return {
@@ -87,6 +91,7 @@ function buildDiaryDay(date: string, entries: DiaryEntry[]): DiaryDay {
     weather,
     location,
     entries: sortedEntries,
+    error,
   };
 }
 
@@ -229,6 +234,7 @@ export function DiaryPreview({ filePath, fileName, metadata, content, aggregateB
               location: meta.location,
               companions: meta.companions || [],
               content: parsed.content,
+              error: combineIssueMessages(parsed.issues),
             };
 
             return entry;
@@ -305,6 +311,13 @@ export function DiaryPreview({ filePath, fileName, metadata, content, aggregateB
         )}
       </header>
 
+      {day.error && (
+        <div className="mb-6 rounded-lg border border-[var(--color-danger)]/30 bg-[var(--color-danger)]/5 p-4 text-sm text-[var(--color-gray)]">
+          <p className="mb-1 font-medium text-[var(--color-danger)]">frontmatter 错误</p>
+          <p>{day.error}</p>
+        </div>
+      )}
+
       <PreviewTagList tags={tags} className="mb-8" />
 
       <div className="grid gap-6">
@@ -332,6 +345,13 @@ export function DiaryPreview({ filePath, fileName, metadata, content, aggregateB
               <p className="text-sm text-[var(--color-gray)] mb-4">
                 {entry.excerpt}
               </p>
+            )}
+
+            {entry.error && (
+              <div className="mb-4 rounded-lg border border-[var(--color-danger)]/30 bg-[var(--color-danger)]/5 p-4 text-sm text-[var(--color-gray)]">
+                <p className="mb-1 font-medium text-[var(--color-danger)]">frontmatter 错误</p>
+                <p>{entry.error}</p>
+              </div>
             )}
 
             <div className="prose-chinese">

@@ -22,15 +22,16 @@ function App() {
   useThemeEffect(settings.theme);
 
   // 初始化工作区时，若自动解析出更“正确”的根目录/类型，则同步写回 settings（修复历史配置造成的判定偏差）
-  const handleWorkspaceResolved = useCallback(async (resolved: { workspacePath: string; workspaceType: 'jasblog' | 'docs' }) => {
+  const handleWorkspaceResolved = useCallback(async (resolved: { workspacePath: string | null; workspaceType: 'jasblog' | 'docs' | null }) => {
     const current = useSettingsStore.getState().settings;
+    const nextWorkspaceType = resolved.workspaceType ?? undefined;
     if (
       current.workspacePath !== resolved.workspacePath ||
-      current.workspaceType !== resolved.workspaceType
+      current.workspaceType !== nextWorkspaceType
     ) {
       await saveSettings({
         workspacePath: resolved.workspacePath,
-        workspaceType: resolved.workspaceType,
+        workspaceType: nextWorkspaceType,
       });
     }
   }, [saveSettings]);

@@ -3,8 +3,8 @@ import type { WorkspaceType } from "@/types";
 
 interface UseWorkspaceInitEffectOptions {
   workspacePath: string | null;
-  initWorkspace: (path: string) => Promise<{ workspacePath: string; workspaceType: WorkspaceType }>;
-  onResolved?: (resolved: { workspacePath: string; workspaceType: WorkspaceType }) => void | Promise<void>;
+  initWorkspace: (path: string) => Promise<{ workspacePath: string | null; workspaceType: WorkspaceType | null }>;
+  onResolved?: (resolved: { workspacePath: string | null; workspaceType: WorkspaceType | null }) => void | Promise<void>;
 }
 
 /**

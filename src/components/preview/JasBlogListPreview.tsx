@@ -4,6 +4,15 @@ import { isTauri } from '@/platform/runtime';
 import { invokeTauri } from '@/platform/tauri';
 import { buildDiaryEntryId, inferDiaryFromFileName, resolveDiaryDate } from '@/services/diary';
 import { parseMarkdownContent, extractGraphFromContent, parseRoadmapItemsFromContent } from '@/services/contentParser';
+import {
+  resolveDiaryDisplay,
+  resolveGraphDisplay,
+  resolveNoteDisplay,
+  resolveProjectDisplay,
+  resolveRoadmapDisplay,
+} from '@/services/displayMetadata';
+import { isPublishableJasBlogPath } from '@/services/jasblogContentPolicy';
+import { combineIssueMessages } from '@/services/previewIssues';
 import { collectLeafFilesByType, isSamePath } from '@/utils';
 import { DIARY_TIMELINE_LABEL } from '@/types';
 import { BackToTop } from './BackToTop';
@@ -152,13 +161,18 @@ function useCachedPreviewData<T>(options: UseCachedPreviewDataOptions<T>): {
 function useMergedActiveItemList<T extends DateSortedListItem>(
   diskItems: T[],
   activeItem: T,
-  activePath: string
+  activePath: string,
+  includeActiveItem = true
 ): T[] {
   return useMemo(() => {
+    if (!includeActiveItem) {
+      return diskItems;
+    }
+
     const merged = [...diskItems.filter((item) => !isSamePath(item.path, activePath)), activeItem];
     merged.sort(sortByDateDesc);
     return merged;
-  }, [diskItems, activeItem, activePath]);
+  }, [diskItems, activeItem, activePath, includeActiveItem]);
 }
 
 function useOpenDetailByPath(options: {
@@ -265,15 +279,22 @@ function NotesListPreview({ activeFile }: { activeFile: EditorFile }) {
   const activePath = activeFile.path;
   const activeSlug = getSlugFromName(activeFile.name);
   const activeMeta = activeFile.metadata as NoteMetadata;
+  const includeActiveItem = workspacePath
+    ? isPublishableJasBlogPath(workspacePath, activePath, 'note')
+    : true;
 
-  const activeItem: NoteListItem = useMemo(() => ({
-    path: activePath,
-    slug: activeSlug,
-    title: activeMeta.title || activeSlug,
-    date: activeMeta.date || '',
-    excerpt: activeMeta.excerpt || '',
-    tags: activeMeta.tags || [],
-  }), [activePath, activeSlug, activeMeta]);
+  const activeItem: NoteListItem = useMemo(() => {
+    const display = resolveNoteDisplay(activeFile.name, activeMeta);
+
+    return {
+      path: activePath,
+      slug: activeSlug,
+      title: display.title,
+      date: display.date,
+      excerpt: activeMeta.excerpt || '',
+      tags: activeMeta.tags || [],
+    };
+  }, [activeFile.name, activePath, activeSlug, activeMeta]);
 
   const loadNoteItems = useCallback(async (): Promise<NoteListItem[]> => {
     const items = await Promise.all(
@@ -282,12 +303,13 @@ function NotesListPreview({ activeFile }: { activeFile: EditorFile }) {
         const parsed = parseMarkdownContent(raw, 'note');
         const meta = parsed.metadata as NoteMetadata;
         const slug = getSlugFromName(node.name);
+        const display = resolveNoteDisplay(node.name, meta);
 
         return {
           path: node.path,
           slug,
-          title: meta.title || slug,
-          date: meta.date || '',
+          title: display.title,
+          date: display.date,
           excerpt: meta.excerpt || '',
           tags: meta.tags || [],
         } satisfies NoteListItem;
@@ -307,7 +329,7 @@ function NotesListPreview({ activeFile }: { activeFile: EditorFile }) {
     errorLabel: '加载 notes 列表',
   });
 
-  const items = useMergedActiveItemList(diskItems, activeItem, activePath);
+  const items = useMergedActiveItemList(diskItems, activeItem, activePath, includeActiveItem);
 
   const allTags = useMemo(() => {
     const tagSet = new Set<string>();
@@ -441,16 +463,23 @@ function ProjectsListPreview({ activeFile }: { activeFile: EditorFile }) {
   const activePath = activeFile.path;
   const activeSlug = getSlugFromName(activeFile.name);
   const activeMeta = activeFile.metadata as ProjectMetadata;
+  const includeActiveItem = workspacePath
+    ? isPublishableJasBlogPath(workspacePath, activePath, 'project')
+    : true;
 
-  const activeItem: ProjectListItem = useMemo(() => ({
-    path: activePath,
-    slug: activeSlug,
-    name: activeMeta.name || activeSlug,
-    description: activeMeta.description || '',
-    date: activeMeta.date || '',
-    tags: activeMeta.tags || [],
-    techStack: activeMeta.techStack || [],
-  }), [activePath, activeSlug, activeMeta]);
+  const activeItem: ProjectListItem = useMemo(() => {
+    const display = resolveProjectDisplay(activeFile.name, activeMeta);
+
+    return {
+      path: activePath,
+      slug: activeSlug,
+      name: display.name,
+      description: activeMeta.description || '',
+      date: display.date,
+      tags: activeMeta.tags || [],
+      techStack: activeMeta.techStack || [],
+    };
+  }, [activeFile.name, activePath, activeSlug, activeMeta]);
 
   const loadProjectItems = useCallback(async (): Promise<ProjectListItem[]> => {
     const items = await Promise.all(
@@ -459,13 +488,14 @@ function ProjectsListPreview({ activeFile }: { activeFile: EditorFile }) {
         const parsed = parseMarkdownContent(raw, 'project');
         const meta = parsed.metadata as ProjectMetadata;
         const slug = getSlugFromName(node.name);
+        const display = resolveProjectDisplay(node.name, meta);
 
         return {
           path: node.path,
           slug,
-          name: meta.name || slug,
+          name: display.name,
           description: meta.description || '',
-          date: meta.date || '',
+          date: display.date,
           tags: meta.tags || [],
           techStack: meta.techStack || [],
         } satisfies ProjectListItem;
@@ -485,7 +515,7 @@ function ProjectsListPreview({ activeFile }: { activeFile: EditorFile }) {
     errorLabel: '加载 projects 列表',
   });
 
-  const items = useMergedActiveItemList(diskItems, activeItem, activePath);
+  const items = useMergedActiveItemList(diskItems, activeItem, activePath, includeActiveItem);
 
   const openProject = useOpenDetailByPath({
     activePath,
@@ -684,11 +714,12 @@ function DiaryTimelinePreview({ activeFile }: { activeFile: EditorFile }) {
         const parsed = parseMarkdownContent(raw, 'diary');
         const meta = parsed.metadata as DiaryMetadata;
 
-        const date = resolveDiaryDate(meta.date, inferred?.date);
+        const display = resolveDiaryDisplay(node.name, meta, inferred);
+        const date = display.date;
         if (!date) return null;
 
-        const title = meta.title || inferred?.title || baseName;
-        const time = meta.time || inferred?.time || '00:00';
+        const title = display.title;
+        const time = display.time || '00:00';
 
         return {
           id: buildDiaryEntryId(node.path, diaryRootPath),
@@ -917,6 +948,9 @@ function GraphsListPreview({ activeFile, activeBodyContent }: { activeFile: Edit
   const activePath = activeFile.path;
   const activeSlug = getSlugFromName(activeFile.name);
   const activeMeta = activeFile.metadata as GraphMetadata;
+  const includeActiveItem = workspacePath
+    ? isPublishableJasBlogPath(workspacePath, activePath, 'graph')
+    : true;
 
   const activeGraphInfo = useMemo(() => {
     const { graphData, error } = extractGraphFromContent(activeBodyContent);
@@ -927,16 +961,20 @@ function GraphsListPreview({ activeFile, activeBodyContent }: { activeFile: Edit
     };
   }, [activeBodyContent]);
 
-  const activeItem: GraphListItem = useMemo(() => ({
-    path: activePath,
-    slug: activeSlug,
-    name: activeMeta.name || activeSlug,
-    description: activeMeta.description || '',
-    date: activeMeta.date || '',
-    nodeCount: activeGraphInfo.nodeCount,
-    edgeCount: activeGraphInfo.edgeCount,
-    error: activeGraphInfo.error,
-  }), [activePath, activeSlug, activeMeta, activeGraphInfo]);
+  const activeItem: GraphListItem = useMemo(() => {
+    const display = resolveGraphDisplay(activeFile.name, activeMeta);
+
+    return {
+      path: activePath,
+      slug: activeSlug,
+      name: display.name,
+      description: activeMeta.description || '',
+      date: display.date,
+      nodeCount: activeGraphInfo.nodeCount,
+      edgeCount: activeGraphInfo.edgeCount,
+      error: combineIssueMessages(activeFile.issues, activeGraphInfo.error),
+    };
+  }, [activeFile.issues, activeFile.name, activePath, activeSlug, activeMeta, activeGraphInfo]);
 
   const loadGraphItems = useCallback(async (): Promise<GraphListItem[]> => {
     const items = await Promise.all(
@@ -945,18 +983,19 @@ function GraphsListPreview({ activeFile, activeBodyContent }: { activeFile: Edit
         const parsed = parseMarkdownContent(raw, 'graph');
         const meta = parsed.metadata as GraphMetadata;
         const slug = getSlugFromName(node.name);
+        const display = resolveGraphDisplay(node.name, meta);
 
         const extracted = extractGraphFromContent(parsed.content);
 
         return {
           path: node.path,
           slug,
-          name: meta.name || slug,
+          name: display.name,
           description: meta.description || '',
-          date: meta.date || '',
+          date: display.date,
           nodeCount: extracted.graphData.nodes.length,
           edgeCount: extracted.graphData.edges.length,
-          error: extracted.error || undefined,
+          error: combineIssueMessages(parsed.issues, extracted.error),
         } satisfies GraphListItem;
       })
     );
@@ -974,7 +1013,7 @@ function GraphsListPreview({ activeFile, activeBodyContent }: { activeFile: Edit
     errorLabel: '加载 graphs 列表',
   });
 
-  const items = useMergedActiveItemList(diskItems, activeItem, activePath);
+  const items = useMergedActiveItemList(diskItems, activeItem, activePath, includeActiveItem);
 
   const openGraph = useOpenDetailByPath({
     activePath,
@@ -1177,21 +1216,28 @@ function RoadmapsListPreview({ activeFile, activeBodyContent }: { activeFile: Ed
   const activePath = activeFile.path;
   const activeSlug = getSlugFromName(activeFile.name);
   const activeMeta = activeFile.metadata as RoadmapMetadata;
+  const includeActiveItem = workspacePath
+    ? isPublishableJasBlogPath(workspacePath, activePath, 'roadmap')
+    : true;
 
   const activeProgress = useMemo(() => {
     const { items } = parseRoadmapItemsFromContent(activeBodyContent);
     return calculateProgress(items);
   }, [activeBodyContent]);
 
-  const activeItem: RoadmapListItem = useMemo(() => ({
-    path: activePath,
-    slug: activeSlug,
-    name: activeMeta.title || activeSlug,
-    description: activeMeta.description || '',
-    date: activeMeta.date || '',
-    status: (activeMeta.status || 'active') as RoadmapStatus,
-    progress: activeProgress,
-  }), [activePath, activeSlug, activeMeta, activeProgress]);
+  const activeItem: RoadmapListItem = useMemo(() => {
+    const display = resolveRoadmapDisplay(activeFile.name, activeMeta);
+
+    return {
+      path: activePath,
+      slug: activeSlug,
+      name: display.title,
+      description: activeMeta.description || '',
+      date: display.date,
+      status: display.status as RoadmapStatus,
+      progress: activeProgress,
+    };
+  }, [activeFile.name, activePath, activeSlug, activeMeta, activeProgress]);
 
   const loadRoadmapItems = useCallback(async (): Promise<RoadmapListItem[]> => {
     const items = await Promise.all(
@@ -1200,16 +1246,17 @@ function RoadmapsListPreview({ activeFile, activeBodyContent }: { activeFile: Ed
         const parsed = parseMarkdownContent(raw, 'roadmap');
         const meta = parsed.metadata as RoadmapMetadata;
         const slug = getSlugFromName(node.name);
+        const display = resolveRoadmapDisplay(node.name, meta);
 
         const { items: parsedItems } = parseRoadmapItemsFromContent(parsed.content);
 
         return {
           path: node.path,
           slug,
-          name: meta.title || slug,
+          name: display.title,
           description: meta.description || '',
-          date: meta.date || '',
-          status: (meta.status || 'active') as RoadmapStatus,
+          date: display.date,
+          status: display.status as RoadmapStatus,
           progress: calculateProgress(parsedItems),
         } satisfies RoadmapListItem;
       })
@@ -1228,7 +1275,7 @@ function RoadmapsListPreview({ activeFile, activeBodyContent }: { activeFile: Ed
     errorLabel: '加载 roadmaps 列表',
   });
 
-  const items = useMergedActiveItemList(diskItems, activeItem, activePath);
+  const items = useMergedActiveItemList(diskItems, activeItem, activePath, includeActiveItem);
 
   const openRoadmap = useOpenDetailByPath({
     activePath,

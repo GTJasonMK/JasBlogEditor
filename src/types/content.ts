@@ -262,6 +262,7 @@ export interface EditorFile {
   type: ContentType;
   content: string;
   metadata: NoteMetadata | ProjectMetadata | DiaryMetadata | RoadmapMetadata | GraphMetadata | DocMetadata;
+  issues: string[];
   frontmatterRaw?: Record<string, unknown>; // 用于保存时尽量保留未知 frontmatter 字段/顺序
   frontmatterBlock?: string; // 原始 frontmatter 块（含 --- 边界），用于“原样保存”（保留注释/格式）
   metadataDirty: boolean; // 是否修改过元数据（仅正文改动时可复用原始 frontmatter）

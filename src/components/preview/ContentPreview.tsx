@@ -5,6 +5,7 @@
 
 import type { EditorFile } from '@/types';
 import { CONTENT_TYPE_UI } from '@/config/contentTypeUi';
+import { PreviewIssuesBanner } from './PreviewIssuesBanner';
 
 interface ContentPreviewProps {
   file: EditorFile;
@@ -13,5 +14,10 @@ interface ContentPreviewProps {
 
 export function ContentPreview({ file, bodyContent }: ContentPreviewProps) {
   const config = CONTENT_TYPE_UI[file.type];
-  return config.renderPreview(file, bodyContent);
+  return (
+    <>
+      <PreviewIssuesBanner issues={file.issues} />
+      {config.renderPreview(file, bodyContent)}
+    </>
+  );
 }

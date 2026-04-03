@@ -19,6 +19,7 @@ import type {
   TechStackItem,
   LineEnding,
 } from '@/types';
+import { readFrontmatterString } from './frontmatter';
 
 function getLocalDateString(): string {
   const now = new Date();
@@ -37,6 +38,7 @@ export function parseMarkdownContent(
   type: ContentType
 ): {
   metadata: NoteMetadata | ProjectMetadata | DiaryMetadata | RoadmapMetadata | GraphMetadata | DocMetadata;
+  issues: string[];
   frontmatterRaw: Record<string, unknown>;
   frontmatterBlock: string | null;
   content: string;
@@ -57,7 +59,7 @@ export function parseMarkdownContent(
   if (!frontmatterMatch) {
     // 没有 frontmatter，返回默认元数据
     const defaultMetadata = getDefaultMetadata(type);
-    return { metadata: defaultMetadata, frontmatterRaw: {}, frontmatterBlock: null, content: rawText, hasFrontmatter: false, hasBom, lineEnding };
+    return { metadata: defaultMetadata, issues: [], frontmatterRaw: {}, frontmatterBlock: null, content: rawText, hasFrontmatter: false, hasBom, lineEnding };
   }
 
   const frontmatterBlock = frontmatterMatch[1] + frontmatterMatch[2] + frontmatterMatch[3];
@@ -69,12 +71,21 @@ export function parseMarkdownContent(
     parsed = parseYAML(yamlContent) || {};
   } catch (error) {
     console.error('YAML 解析失败:', error);
-    return { metadata: getDefaultMetadata(type), frontmatterRaw: {}, frontmatterBlock, content: bodyContent, hasFrontmatter: true, hasBom, lineEnding };
+    return {
+      metadata: getDefaultMetadata(type),
+      issues: [`${type} frontmatter YAML 解析失败：${getErrorMessage(error)}`],
+      frontmatterRaw: {},
+      frontmatterBlock,
+      content: bodyContent,
+      hasFrontmatter: true,
+      hasBom,
+      lineEnding,
+    };
   }
 
   // 根据类型构建元数据
-  const metadata = buildMetadata(parsed, type);
-  return { metadata, frontmatterRaw: parsed, frontmatterBlock, content: bodyContent, hasFrontmatter: true, hasBom, lineEnding };
+  const { metadata, issues } = buildMetadata(parsed, type);
+  return { metadata, issues, frontmatterRaw: parsed, frontmatterBlock, content: bodyContent, hasFrontmatter: true, hasBom, lineEnding };
 }
 
 /**
@@ -83,66 +94,86 @@ export function parseMarkdownContent(
 function buildMetadata(
   parsed: Record<string, unknown>,
   type: ContentType
-): NoteMetadata | ProjectMetadata | DiaryMetadata | RoadmapMetadata | GraphMetadata | DocMetadata {
-  const today = getLocalDateString();
-
+): {
+  metadata: NoteMetadata | ProjectMetadata | DiaryMetadata | RoadmapMetadata | GraphMetadata | DocMetadata;
+  issues: string[];
+} {
   if (type === 'note') {
     return {
-      title: String(parsed.title || ''),
-      date: String(parsed.date || today),
-      excerpt: String(parsed.excerpt || ''),
-      tags: normalizeStringArray(parsed.tags),
+      metadata: {
+        title: readFrontmatterString(parsed.title) ?? '',
+        date: parsed.date ? String(parsed.date) : '',
+        excerpt: readFrontmatterString(parsed.excerpt) ?? '',
+        tags: normalizeStringArray(parsed.tags),
+      },
+      issues: [],
     };
   }
 
   if (type === 'project') {
     return {
-      name: String(parsed.name || parsed.title || ''),
-      description: String(parsed.description || ''),
-      github: String(parsed.github || ''),
-      demo: parsed.demo ? String(parsed.demo) : undefined,
-      date: parsed.date ? String(parsed.date) : undefined,
-      tags: normalizeStringArray(parsed.tags),
-      techStack: normalizeTechStack(parsed.techStack),
+      metadata: {
+        name: readFrontmatterString(parsed.name, parsed.title) ?? '',
+        description: readFrontmatterString(parsed.description) ?? '',
+        github: readFrontmatterString(parsed.github) ?? '',
+        demo: readFrontmatterString(parsed.demo),
+        date: parsed.date ? String(parsed.date) : undefined,
+        tags: normalizeStringArray(parsed.tags),
+        techStack: normalizeTechStack(parsed.techStack),
+      },
+      issues: [],
     };
   }
 
   if (type === 'diary') {
     return {
-      title: String(parsed.title || ''),
-      // 与 JasBlog 行为对齐：date/time 缺失时可从文件名推断（推断逻辑在 openFile 侧做）
-      date: parsed.date ? String(parsed.date) : '',
-      time: normalizeTime(parsed.time),
-      excerpt: String(parsed.excerpt || ''),
-      tags: normalizeStringArray(parsed.tags),
-      mood: parsed.mood ? String(parsed.mood) : undefined,
-      weather: parsed.weather ? String(parsed.weather) : undefined,
-      location: parsed.location ? String(parsed.location) : undefined,
-      companions: normalizeStringArray(parsed.companions),
+      metadata: {
+        title: readFrontmatterString(parsed.title) ?? '',
+        // 与 JasBlog 行为对齐：date/time 缺失时可从文件名推断（推断逻辑在 openFile 侧做）
+        date: parsed.date ? String(parsed.date) : '',
+        time: normalizeTime(parsed.time),
+        excerpt: readFrontmatterString(parsed.excerpt) ?? '',
+        tags: normalizeStringArray(parsed.tags),
+        mood: readFrontmatterString(parsed.mood),
+        weather: readFrontmatterString(parsed.weather),
+        location: readFrontmatterString(parsed.location),
+        companions: normalizeStringArray(parsed.companions),
+      },
+      issues: [],
     };
   }
 
   if (type === 'roadmap') {
+    const status = normalizeRoadmapStatus(parsed.status);
     return {
-      title: String(parsed.title || parsed.name || ''),
-      description: String(parsed.description || ''),
-      date: parsed.date ? String(parsed.date) : undefined,
-      status: normalizeRoadmapStatus(parsed.status),
+      metadata: {
+        title: readFrontmatterString(parsed.title, parsed.name) ?? '',
+        description: readFrontmatterString(parsed.description) ?? '',
+        date: parsed.date ? String(parsed.date) : undefined,
+        status: status.value,
+      },
+      issues: status.issue ? [status.issue] : [],
     };
   }
 
   if (type === 'graph') {
     return {
-      name: String(parsed.name || parsed.title || ''),
-      description: String(parsed.description || ''),
-      date: parsed.date ? String(parsed.date) : undefined,
+      metadata: {
+        name: readFrontmatterString(parsed.name, parsed.title) ?? '',
+        description: readFrontmatterString(parsed.description) ?? '',
+        date: parsed.date ? String(parsed.date) : undefined,
+      },
+      issues: [],
     };
   }
 
   // doc 类型（普通文档）
   return {
-    title: String(parsed.title || ''),
-    date: parsed.date ? String(parsed.date) : undefined,
+    metadata: {
+      title: readFrontmatterString(parsed.title) ?? '',
+      date: parsed.date ? String(parsed.date) : undefined,
+    },
+    issues: [],
   };
 }
 
@@ -238,9 +269,20 @@ function normalizeTime(value: unknown): string {
 /**
  * 标准化规划状态
  */
-function normalizeRoadmapStatus(value: unknown): 'active' | 'completed' | 'paused' {
-  if (value === 'completed' || value === 'paused') return value;
-  return 'active';
+function normalizeRoadmapStatus(value: unknown): {
+  value: 'active' | 'completed' | 'paused';
+  issue?: string;
+} {
+  if (value === undefined || value === null || value === '' || value === 'active') {
+    return { value: 'active' };
+  }
+  if (value === 'completed' || value === 'paused') {
+    return { value };
+  }
+  return {
+    value: 'active',
+    issue: `roadmap status 非法：${String(value)}，已按 active 处理`,
+  };
 }
 
 /**
@@ -705,7 +747,7 @@ function getDefaultMetadata(type: ContentType): NoteMetadata | ProjectMetadata |
   if (type === 'note') {
     return {
       title: '',
-      date: today,
+      date: '',
       excerpt: '',
       tags: [],
     };
@@ -743,7 +785,7 @@ function getDefaultMetadata(type: ContentType): NoteMetadata | ProjectMetadata |
     return {
       name: '',
       description: '',
-      date: today,
+      date: undefined,
     };
   }
 
@@ -752,6 +794,13 @@ function getDefaultMetadata(type: ContentType): NoteMetadata | ProjectMetadata |
     title: '',
     date: undefined,
   };
+}
+
+function getErrorMessage(error: unknown): string {
+  if (error instanceof Error) {
+    return error.message.split('\n')[0] || error.message;
+  }
+  return String(error);
 }
 
 /**

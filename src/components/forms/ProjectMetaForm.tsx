@@ -2,28 +2,12 @@ import { useEditorStore } from '@/store';
 import { TagInput } from './TagInput';
 import type { ProjectMetadata } from '@/types';
 
-// 简单的 URL 验证
-function isValidUrl(url: string): boolean {
-  if (!url) return true; // 空值对于可选字段是有效的
-  try {
-    new URL(url);
-    return true;
-  } catch {
-    return false;
-  }
-}
-
 export function ProjectMetaForm() {
   const { currentFile, updateMetadata } = useEditorStore();
 
   if (!currentFile || currentFile.type !== 'project') return null;
 
   const metadata = currentFile.metadata as ProjectMetadata;
-
-  // 验证
-  const isNameEmpty = !metadata.name.trim();
-  const isGithubInvalid = metadata.github && !isValidUrl(metadata.github);
-  const isDemoInvalid = metadata.demo && !isValidUrl(metadata.demo);
 
   // 技术栈：TechStackItem[] <-> string[] 转换
   const techStackItems = metadata.techStack || [];
@@ -38,21 +22,13 @@ export function ProjectMetaForm() {
     <div className="space-y-4">
       {/* 标题 */}
       <div>
-        <label className="block text-xs text-[var(--color-text-muted)] mb-1">
-          项目名称 <span className="text-[var(--color-danger)]">*</span>
-        </label>
+        <label className="block text-xs text-[var(--color-text-muted)] mb-1">项目名称</label>
         <input
           type="text"
           value={metadata.name}
           onChange={(e) => updateMetadata({ name: e.target.value })}
-          className={`w-full px-3 py-2 text-sm border rounded-md focus:outline-none focus:border-[var(--color-primary)] ${
-            isNameEmpty ? 'border-[var(--color-danger)]' : 'border-[var(--color-border)]'
-          }`}
-          required
+          className="w-full px-3 py-2 text-sm border border-[var(--color-border)] rounded-md focus:outline-none focus:border-[var(--color-primary)]"
         />
-        {isNameEmpty && (
-          <span className="text-xs text-[var(--color-danger)] mt-1">项目名称不能为空</span>
-        )}
       </div>
 
       {/* 描述 */}
@@ -70,34 +46,24 @@ export function ProjectMetaForm() {
       <div>
         <label className="block text-xs text-[var(--color-text-muted)] mb-1">GitHub 地址</label>
         <input
-          type="url"
+          type="text"
           value={metadata.github}
           onChange={(e) => updateMetadata({ github: e.target.value })}
           placeholder="https://github.com/..."
-          className={`w-full px-3 py-2 text-sm border rounded-md focus:outline-none focus:border-[var(--color-primary)] ${
-            isGithubInvalid ? 'border-[var(--color-danger)]' : 'border-[var(--color-border)]'
-          }`}
+          className="w-full px-3 py-2 text-sm border border-[var(--color-border)] rounded-md focus:outline-none focus:border-[var(--color-primary)]"
         />
-        {isGithubInvalid && (
-          <span className="text-xs text-[var(--color-danger)] mt-1">请输入有效的 URL</span>
-        )}
       </div>
 
       {/* Demo */}
       <div>
         <label className="block text-xs text-[var(--color-text-muted)] mb-1">Demo 地址</label>
         <input
-          type="url"
+          type="text"
           value={metadata.demo || ''}
           onChange={(e) => updateMetadata({ demo: e.target.value || undefined })}
           placeholder="https://..."
-          className={`w-full px-3 py-2 text-sm border rounded-md focus:outline-none focus:border-[var(--color-primary)] ${
-            isDemoInvalid ? 'border-[var(--color-danger)]' : 'border-[var(--color-border)]'
-          }`}
+          className="w-full px-3 py-2 text-sm border border-[var(--color-border)] rounded-md focus:outline-none focus:border-[var(--color-primary)]"
         />
-        {isDemoInvalid && (
-          <span className="text-xs text-[var(--color-danger)] mt-1">请输入有效的 URL</span>
-        )}
       </div>
 
       {/* 技术栈 */}

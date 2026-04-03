@@ -2,6 +2,8 @@ import { create } from 'zustand';
 import { invokeTauri } from '@/platform/tauri';
 import { CONTENT_DIRS, JASBLOG_CONTENT_TYPES } from '@/types';
 import type { ContentType, WorkspaceType, JasBlogContentType } from '@/types';
+import { resolveWorkspaceInitialization } from './workspaceInitialization';
+import { supportsNestedJasBlogContent } from '@/services/jasblogContentPolicy';
 
 export interface FileTreeNode {
   name: string;
@@ -21,7 +23,7 @@ interface FileState {
 
   setWorkspacePath: (path: string) => void;
   setWorkspaceType: (type: WorkspaceType) => void;
-  initWorkspace: (path: string) => Promise<{ workspacePath: string; workspaceType: WorkspaceType }>;
+  initWorkspace: (path: string) => Promise<{ workspacePath: string | null; workspaceType: WorkspaceType | null }>;
   detectWorkspaceType: () => Promise<WorkspaceType>;
   loadFileTree: () => Promise<void>;
   refreshFileTree: () => Promise<void>;
@@ -174,6 +176,10 @@ async function loadJasBlogContentTree(
     if (file.name.startsWith('.')) continue;
 
     if (file.is_dir) {
+      if (!supportsNestedJasBlogContent(contentType)) {
+        continue;
+      }
+
       const children = await loadJasBlogContentTree(file.path, contentType, depth + 1);
       if (children.length > 0) {
         nodes.push({
@@ -259,31 +265,50 @@ export const useFileStore = create<FileState>((set, get) => {
     initWorkspace: async (path) => {
       const requestId = ++initRequestId;
 
-      const resolvedPath = await resolveWorkspacePath(path);
-      const detectedType = await detectWorkspaceTypeByPath(resolvedPath);
-
-      const workspaceType = detectedType;
+      const resolved = await resolveWorkspaceInitialization(path, {
+        resolveWorkspacePath,
+        detectWorkspaceTypeByPath,
+        pathExists: async (candidatePath) =>
+          invokeTauri('path_exists', { path: candidatePath }),
+      });
 
       if (requestId !== initRequestId) {
-        return { workspacePath: resolvedPath, workspaceType };
+        return {
+          workspacePath: resolved.workspacePath,
+          workspaceType: resolved.workspaceType,
+        };
       }
+
+      if (resolved.status === 'missing') {
+        set({
+          workspacePath: null,
+          workspaceType: null,
+          fileTree: [],
+          fileTreeVersion: 0,
+          isLoading: false,
+          error: resolved.error,
+        });
+        return { workspacePath: null, workspaceType: null };
+      }
+
+      const { workspacePath, workspaceType } = resolved;
 
       const current = get();
       if (
-        current.workspacePath === resolvedPath &&
+        current.workspacePath === workspacePath &&
         current.workspaceType === workspaceType &&
         current.fileTreeVersion > 0 &&
         !current.isLoading
       ) {
-        return { workspacePath: resolvedPath, workspaceType };
+        return { workspacePath, workspaceType };
       }
 
       // 先写入路径，确保后续 loadFileTree 使用的是最新值
-      set({ workspacePath: resolvedPath, workspaceType, fileTree: [], fileTreeVersion: 0, error: null });
+      set({ workspacePath, workspaceType, fileTree: [], fileTreeVersion: 0, error: null });
 
       // 加载文件树
       await get().loadFileTree();
-      return { workspacePath: resolvedPath, workspaceType };
+      return { workspacePath, workspaceType };
     },
 
     detectWorkspaceType: async () => {

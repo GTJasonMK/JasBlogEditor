@@ -79,7 +79,11 @@ export const CONTENT_TYPE_UI: Record<ContentType, ContentTypeUiConfig> = {
     MetaForm: ProjectMetaForm,
     renderPreview: (file, bodyContent) => (
       <Suspense fallback={<PreviewLoading />}>
-        <LazyProjectPreview metadata={file.metadata as ProjectMetadata} content={bodyContent} />
+        <LazyProjectPreview
+          fileName={file.name}
+          metadata={file.metadata as ProjectMetadata}
+          content={bodyContent}
+        />
       </Suspense>
     ),
   },
@@ -100,7 +104,11 @@ export const CONTENT_TYPE_UI: Record<ContentType, ContentTypeUiConfig> = {
     MetaForm: RoadmapMetaForm,
     renderPreview: (file, bodyContent) => (
       <Suspense fallback={<PreviewLoading />}>
-        <LazyRoadmapPreview metadata={file.metadata as RoadmapMetadata} content={bodyContent} />
+        <LazyRoadmapPreview
+          fileName={file.name}
+          metadata={file.metadata as RoadmapMetadata}
+          content={bodyContent}
+        />
       </Suspense>
     ),
   },
@@ -108,7 +116,11 @@ export const CONTENT_TYPE_UI: Record<ContentType, ContentTypeUiConfig> = {
     MetaForm: GraphMetaForm,
     renderPreview: (file, bodyContent) => (
       <Suspense fallback={<PreviewLoading />}>
-        <LazyGraphPreview metadata={file.metadata as GraphMetadata} content={bodyContent} />
+        <LazyGraphPreview
+          fileName={file.name}
+          metadata={file.metadata as GraphMetadata}
+          content={bodyContent}
+        />
       </Suspense>
     ),
   },

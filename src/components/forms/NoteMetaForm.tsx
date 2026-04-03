@@ -9,28 +9,17 @@ export function NoteMetaForm() {
 
   const metadata = currentFile.metadata as NoteMetadata;
 
-  // 验证标题是否为空
-  const isTitleEmpty = !metadata.title.trim();
-
   return (
     <div className="space-y-4">
       {/* 标题 */}
       <div>
-        <label className="block text-xs text-[var(--color-text-muted)] mb-1">
-          标题 <span className="text-[var(--color-danger)]">*</span>
-        </label>
+        <label className="block text-xs text-[var(--color-text-muted)] mb-1">标题</label>
         <input
           type="text"
           value={metadata.title}
           onChange={(e) => updateMetadata({ title: e.target.value })}
-          className={`w-full px-3 py-2 text-sm border rounded-md focus:outline-none focus:border-[var(--color-primary)] ${
-            isTitleEmpty ? 'border-[var(--color-danger)]' : 'border-[var(--color-border)]'
-          }`}
-          required
+          className="w-full px-3 py-2 text-sm border border-[var(--color-border)] rounded-md focus:outline-none focus:border-[var(--color-primary)]"
         />
-        {isTitleEmpty && (
-          <span className="text-xs text-[var(--color-danger)] mt-1">标题不能为空</span>
-        )}
       </div>
 
       {/* 日期 */}

@@ -76,6 +76,7 @@ export function prepareDocumentSave(currentFile: EditorFile): PreparedDocumentSa
       ...currentFile,
       isDirty: false,
       metadataDirty: false,
+      issues: reparsed.issues,
       hasFrontmatter: reparsed.hasFrontmatter,
       frontmatterBlock: nextFrontmatterBlock,
       frontmatterRaw: nextFrontmatterRaw,

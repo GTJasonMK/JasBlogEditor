@@ -16,6 +16,7 @@ function createEditorFile(): EditorFile {
       excerpt: 'agent',
       tags: ['agent'],
     },
+    issues: [],
     metadataDirty: false,
     isDirty: true,
     hasFrontmatter: true,

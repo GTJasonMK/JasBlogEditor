@@ -1,21 +1,19 @@
-import { useEffect, useMemo, useRef, useState, type ReactElement, type ReactNode } from 'react';
-import { MarkdownRenderer } from '@/components/preview';
+import { useEffect, useMemo, useRef, useState, type ReactElement } from 'react';
 import { RoadmapPreview } from '@/components/preview/previews/RoadmapPreview';
 import { GraphPreview } from '@/components/preview/previews/GraphPreview';
-import { NotePreview } from '@/components/preview/previews/NotePreview';
-import { ProjectPreview } from '@/components/preview/previews/ProjectPreview';
-import { DiaryPreview } from '@/components/preview/previews/DiaryPreview';
-import { DocPreview } from '@/components/preview/previews/DocPreview';
-import { parseMarkdownContent } from '@/services/contentParser';
 import type {
-  ContentType,
-  DocMetadata,
-  DiaryMetadata,
   GraphMetadata,
-  NoteMetadata,
-  ProjectMetadata,
   RoadmapMetadata,
 } from '@/types';
+import { FrontmatterHelpTab } from './help/FrontmatterHelpTab';
+import { FRONTMATTER_SECTION_LINKS } from './help/frontmatterHelpData';
+import {
+  CodeCard,
+  MarkdownPreview,
+  PreviewCard,
+  Section,
+  SideBySideExample,
+} from './help/helpBlocks';
 
 interface HelpModalProps {
   open: boolean;
@@ -38,80 +36,6 @@ interface HelpTab {
   label: string;
   keywords: string[];
   render: () => ReactElement;
-}
-
-function Section({ id, title, children }: { id?: string; title: string; children: ReactNode }) {
-  return (
-    <section id={id} className="mb-8 scroll-mt-4">
-      <h3 className="text-base font-semibold text-[var(--color-text)] mb-3">{title}</h3>
-      {children}
-    </section>
-  );
-}
-
-function CodeCard({ title, code }: { title: string; code: string }) {
-  return (
-    <div className="bg-[var(--color-surface)] border border-[var(--color-border)] rounded-lg overflow-hidden">
-      <div className="px-3 py-2 text-xs text-[var(--color-text-muted)] border-b border-[var(--color-border)]">
-        {title}
-      </div>
-      <pre className="p-3 text-xs overflow-auto leading-relaxed">
-        <code className="font-mono whitespace-pre">{code}</code>
-      </pre>
-    </div>
-  );
-}
-
-function PreviewCard({ title, children }: { title: string; children: ReactNode }) {
-  return (
-    <div className="bg-[var(--color-paper)] border border-[var(--color-border)] rounded-lg overflow-hidden">
-      <div className="px-3 py-2 text-xs text-[var(--color-text-muted)] border-b border-[var(--color-border)]">
-        {title}
-      </div>
-      <div className="p-4">
-        {children}
-      </div>
-    </div>
-  );
-}
-
-function SideBySideExample({
-  title,
-  description,
-  codeTitle = '语法示例',
-  previewTitle = '渲染效果',
-  id,
-  code,
-  preview,
-}: {
-  title: string;
-  description?: string;
-  codeTitle?: string;
-  previewTitle?: string;
-  id?: string;
-  code: string;
-  preview: ReactNode;
-}) {
-  return (
-    <div id={id} className="mb-6 scroll-mt-4">
-      <div className="mb-2">
-        <h4 className="text-sm font-medium text-[var(--color-text)]">{title}</h4>
-        {description && <p className="text-xs text-[var(--color-text-muted)] mt-1">{description}</p>}
-      </div>
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
-        <CodeCard title={codeTitle} code={code} />
-        <PreviewCard title={previewTitle}>{preview}</PreviewCard>
-      </div>
-    </div>
-  );
-}
-
-function MarkdownPreview({ content }: { content: string }) {
-  return (
-    <article className="prose-chinese">
-      <MarkdownRenderer content={content} />
-    </article>
-  );
 }
 
 function DataUriImage(): string {
@@ -168,14 +92,7 @@ const tabSectionMap: Record<HelpTabId, { id: string; title: string }[]> = {
   ],
   frontmatter: [
     { id: 'frontmatter-support', title: '说明' },
-    { id: 'frontmatter-fields', title: '字段矩阵速查' },
-    { id: 'frontmatter-note', title: 'note 示例' },
-    { id: 'frontmatter-diary', title: 'diary / 考研日志 示例' },
-    { id: 'frontmatter-project', title: 'project 示例' },
-    { id: 'frontmatter-roadmap', title: 'roadmap 示例' },
-    { id: 'frontmatter-graph', title: 'graph 示例' },
-    { id: 'frontmatter-doc', title: 'doc 示例' },
-    { id: 'frontmatter-faq', title: '解析注意事项' },
+    ...FRONTMATTER_SECTION_LINKS.slice(1),
   ],
 };
 
@@ -364,21 +281,6 @@ export function HelpModal({ open, onClose }: HelpModalProps) {
       '> Alert 标记必须出现在引用块第一行。',
     ].join('\n');
 
-    const frontmatterFieldTable = [
-      '| 类型 | 必填字段 | 可选字段 | 默认/回退行为 |',
-      '| --- | --- | --- | --- |',
-      '| note | `title` | `date/excerpt/tags` | `date` 默认为当天 |',
-      '| project | `name/description/github` | `demo/date/tags/techStack` | 缺失时按字段默认空值处理 |',
-      '| diary（考研日志） | `title/date` | `time/excerpt/tags/mood/weather/location/companions` | `time` 缺失时回退 `00:00` |',
-      '| roadmap | `title/description` | `date/status` | `status` 非法值回退 `active` |',
-      '| graph | `name` | `description/date` | 若无 `name` 会尝试读取 `title` |',
-      '| doc | 无强制 | `title/date` | 无 frontmatter 也可渲染正文 |',
-      '',
-      '保存策略：仅正文改动时会尽量原样保留 frontmatter（包含注释/缩进/空行）。',
-      '当元数据字段发生变化时会重新序列化 frontmatter（可能丢失注释与原始排版）。',
-      '序列化会跳过 `undefined/null`；并保留常见空数组字段（`tags/companions/techStack`）以减少无意义 diff。',
-    ].join('\n');
-
     const graphSchemaExample = [
       '{',
       '  "nodes": [',
@@ -453,112 +355,6 @@ export function HelpModal({ open, onClose }: HelpModalProps) {
       '- 节点颜色：`default/red/orange/yellow/green/blue/purple/pink`',
       '- 连线颜色：由“源节点”的 `data.edgeColor` 控制（`default` 或 `p0~p9`）',
     ].join('\n');
-
-    function parseForPreview(type: ContentType, raw: string) {
-      const parsed = parseMarkdownContent(raw, type);
-      return parsed;
-    }
-
-    const noteRaw = [
-      '---',
-      'title: 前端渲染能力一览',
-      'date: 2026-02-05',
-      'excerpt: 这是摘要（可选）',
-      'tags: [markdown, preview]',
-      '---',
-      '',
-      '这里是正文内容，支持 **Markdown 渲染**。',
-      '',
-      '> [!TIP]',
-      '> 你可以在帮助面板里查看完整语法。',
-    ].join('\n');
-
-    const diaryRaw = [
-      '---',
-      'title: 政治晨读记录',
-      'date: 2026-02-18',
-      'time: 09:00',
-      'excerpt: 记录今天的政治晨读安排、完成情况与复盘',
-      'tags: [考研, 政治]',
-      'mood: focused',
-      'weather: clear',
-      'location: home desk',
-      'companions: [solo]',
-      '---',
-      '',
-      '## 今日目标',
-      '',
-      '- 完成政治马原第一章晨读',
-      '',
-      '## 问题复盘',
-      '',
-      '> [!TIP]',
-      '> 考研日志也支持 Alert / 表格 / 代码块。',
-      '',
-      '```js',
-      'console.log(\"review complete\");',
-      '```',
-    ].join('\n');
-
-    const projectRaw = [
-      '---',
-      'name: JasBlogEditor',
-      'description: 一个基于 Tauri 2 + React 19 的桌面编辑器',
-      'github: https://github.com/your/repo',
-      'demo: https://example.com',
-      'tags: [tauri, react]',
-      'techStack:',
-      '  - name: React',
-      '    icon: React',
-      '  - name: TypeScript',
-      '    icon: TS',
-      '  - name: Tauri',
-      '    icon: Tauri',
-      '---',
-      '',
-      '## 项目介绍',
-      '',
-      '- 支持 Markdown + 预览',
-      '- 支持 Mermaid / KaTeX',
-    ].join('\n');
-
-    const roadmapRaw = [
-      '---',
-      'title: 我的规划示例',
-      'description: 任务项会被解析为卡片并按状态分组',
-      'status: active',
-      '---',
-      '',
-      roadmapBodyExample,
-    ].join('\n');
-
-    const graphRaw = [
-      '---',
-      'name: 示例图谱',
-      'description: graph 代码块会被解析为交互式图谱',
-      'date: 2026-02-05',
-      '---',
-      '',
-      graphBodyExample,
-    ].join('\n');
-
-    const docRaw = [
-      '---',
-      'title: 普通文档',
-      'date: 2026-02-05',
-      '---',
-      '',
-      '# 文档标题（正文里的标题）',
-      '',
-      '普通文档类型同样支持 Mermaid / KaTeX / GFM 等语法。',
-    ].join('\n');
-
-    const noteParsed = parseForPreview('note', noteRaw);
-    const diaryParsed = parseForPreview('diary', diaryRaw);
-    const projectParsed = parseForPreview('project', projectRaw);
-    const roadmapParsed = parseForPreview('roadmap', roadmapRaw);
-    const graphParsed = parseForPreview('graph', graphRaw);
-    const docParsed = parseForPreview('doc', docRaw);
 
     return [
       {
@@ -811,9 +607,10 @@ export function HelpModal({ open, onClose }: HelpModalProps) {
               title="任务语法示例"
               id="roadmap-example"
               code={roadmapBodyExample}
-              preview={
-                <div className="max-h-[520px] overflow-auto">
+	              preview={
+	                <div className="max-h-[520px] overflow-auto">
 	                  <RoadmapPreview
+	                    fileName="roadmap-help.md"
 	                    metadata={{ title: '示例规划', description: '任务项解析示例', status: 'active' } as RoadmapMetadata}
 	                    content={roadmapBodyExample}
 	                    embedded
@@ -855,9 +652,10 @@ export function HelpModal({ open, onClose }: HelpModalProps) {
               title="graph 代码块示例"
               id="graph-example"
               code={graphBodyExample}
-              preview={
-                <div className="h-[680px] overflow-hidden">
+	              preview={
+	                <div className="h-[680px] overflow-hidden">
 	                  <GraphPreview
+	                    fileName="graph-help.md"
 	                    metadata={{ name: '示例图谱', description: 'graph 代码块解析示例', date: '2026-02-05' } as GraphMetadata}
 	                    content={graphBodyExample}
 	                    embedded
@@ -894,130 +692,8 @@ export function HelpModal({ open, onClose }: HelpModalProps) {
       {
         id: 'frontmatter',
         label: 'Frontmatter 元数据',
-        keywords: ['frontmatter', 'yaml', '元数据', 'metadata'],
-        render: () => (
-          <div>
-            <Section id="frontmatter-support" title="说明">
-              <p className="text-sm text-[var(--color-text)] leading-relaxed">
-                支持 YAML frontmatter（文件开头的 <code className="font-mono">---</code> 区块）。
-                应用会将 frontmatter 解析为“元数据”，并在不同内容类型的预览页以不同方式展示；正文部分再进行 Markdown 渲染。
-              </p>
-            </Section>
-
-            <SideBySideExample
-              title="字段矩阵速查"
-              id="frontmatter-fields"
-              description="按内容类型汇总必填/可选字段与默认回退行为。"
-              code={frontmatterFieldTable}
-              preview={<MarkdownPreview content={frontmatterFieldTable} />}
-              previewTitle="字段说明（表格渲染）"
-            />
-
-            <SideBySideExample
-              title="note（笔记）"
-              description="字段：title/date/excerpt/tags"
-              code={noteRaw}
-	              preview={
-	                <div className="max-h-[520px] overflow-auto">
-		                  <NotePreview
-		                    fileName="help-note.md"
-		                    metadata={noteParsed.metadata as NoteMetadata}
-		                    content={noteParsed.content}
-		                    embedded
-		                  />
-		                </div>
-		              }
-	              id="frontmatter-note"
-	              previewTitle="渲染效果（NotePreview）"
-	            />
-
-            <SideBySideExample
-              title="diary（考研日志）"
-              description="字段：title/date/time/excerpt/tags/mood/weather/location/companions"
-              code={diaryRaw}
-	              preview={
-	                <div className="max-h-[520px] overflow-auto">
-		                  <DiaryPreview
-		                    filePath="content/diary/2026/02/2026-02-18-09-00-help.md"
-		                    fileName="2026-02-18-09-00-help.md"
-		                    metadata={diaryParsed.metadata as DiaryMetadata}
-		                    content={diaryParsed.content}
-		                    aggregateByDay={false}
-		                    embedded
-		                  />
-		                </div>
-		              }
-	              id="frontmatter-diary"
-	              previewTitle="渲染效果（DiaryPreview）"
-	            />
-
-            <SideBySideExample
-              title="project（项目）"
-              description="字段：name/description/github/demo/tags/techStack（兼容 title 作为回退）"
-              code={projectRaw}
-	              preview={
-	                <div className="max-h-[520px] overflow-auto">
-	                  <ProjectPreview
-	                    metadata={projectParsed.metadata as ProjectMetadata}
-	                    content={projectParsed.content}
-	                    embedded
-	                  />
-	                </div>
-	              }
-	              id="frontmatter-project"
-	              previewTitle="渲染效果（ProjectPreview）"
-	            />
-
-            <SideBySideExample
-              title="roadmap（规划）"
-              description="字段：title/description/status；正文任务会被解析为卡片"
-              code={roadmapRaw}
-	              preview={
-	                <div className="max-h-[520px] overflow-auto">
-	                  <RoadmapPreview metadata={roadmapParsed.metadata as RoadmapMetadata} content={roadmapParsed.content} embedded />
-	                </div>
-	              }
-	              id="frontmatter-roadmap"
-	              previewTitle="渲染效果（RoadmapPreview）"
-	            />
-
-            <SideBySideExample
-              title="graph（图谱）"
-              description="字段：name/description/date；正文 graph 代码块会渲染为图谱"
-              code={graphRaw}
-	              preview={
-	                <div className="h-[680px] overflow-hidden">
-	                  <GraphPreview metadata={graphParsed.metadata as GraphMetadata} content={graphParsed.content} embedded />
-	                </div>
-	              }
-	              id="frontmatter-graph"
-	              previewTitle="渲染效果（GraphPreview）"
-	            />
-
-            <SideBySideExample
-              title="doc（普通文档）"
-              description="字段：title/date（可选）"
-              code={docRaw}
-              preview={
-                <div className="max-h-[520px] overflow-auto">
-                  <DocPreview metadata={docParsed.metadata as DocMetadata} content={docParsed.content} />
-                </div>
-              }
-              id="frontmatter-doc"
-              previewTitle="渲染效果（DocPreview）"
-            />
-
-            <Section id="frontmatter-faq" title="Frontmatter 解析注意事项">
-              <ul className="text-sm text-[var(--color-text)] list-disc pl-5 space-y-1">
-                <li>无 frontmatter 时会自动生成类型默认元数据，不影响正文编辑与预览。</li>
-                <li>YAML 语法错误时会回退到默认元数据，但正文会继续保留并正常渲染。</li>
-                <li>仅修改正文时会原样保留 frontmatter；修改元数据字段后会尽量在原 frontmatter 上做“增量更新”（未知字段/顺序/大部分注释可保留，但被修改字段的格式仍可能变化）。</li>
-                <li><code className="font-mono">roadmap.status</code> 仅支持 <code className="font-mono">active/completed/paused</code>，非法值回退 <code className="font-mono">active</code>。</li>
-                <li><code className="font-mono">graph</code> 类型优先读取 <code className="font-mono">name</code>，缺失时会回退读取 <code className="font-mono">title</code>。</li>
-              </ul>
-            </Section>
-          </div>
-        ),
+        keywords: ['frontmatter', 'yaml', '元数据', 'metadata', '示例', '写作', '指南'],
+        render: () => <FrontmatterHelpTab />,
       },
     ];
   }, []);

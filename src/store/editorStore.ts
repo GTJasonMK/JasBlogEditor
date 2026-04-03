@@ -152,6 +152,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
           type,
           content: parsed.content,
           metadata,
+          issues: parsed.issues,
           frontmatterRaw: parsed.hasFrontmatter ? parsed.frontmatterRaw : undefined,
           frontmatterBlock: parsed.hasFrontmatter ? parsed.frontmatterBlock ?? undefined : undefined,
           metadataDirty: false,

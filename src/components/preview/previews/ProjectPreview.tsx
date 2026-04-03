@@ -1,4 +1,5 @@
 import type { ProjectMetadata } from '@/types';
+import { resolveProjectDisplay } from '@/services/displayMetadata';
 import { MarkdownRenderer } from '../MarkdownRenderer';
 import { TechStack } from '../TechStack';
 import { BackToTop } from '../BackToTop';
@@ -6,13 +7,16 @@ import { PreviewBackButton } from '../PreviewBackButton';
 import { PreviewDescription, PreviewTagList } from '../PreviewMeta';
 
 interface ProjectPreviewProps {
+  fileName: string;
   metadata: ProjectMetadata;
   content: string;
   embedded?: boolean;
 }
 
 // 开源项目预览（与 JasBlog projects/[slug]/page.tsx 一致）
-export function ProjectPreview({ metadata, content, embedded = false }: ProjectPreviewProps) {
+export function ProjectPreview({ fileName, metadata, content, embedded = false }: ProjectPreviewProps) {
+  const display = resolveProjectDisplay(fileName, metadata);
+
   return (
     <div className="max-w-4xl mx-auto px-6 py-12">
       {!embedded && (
@@ -21,7 +25,7 @@ export function ProjectPreview({ metadata, content, embedded = false }: ProjectP
 
       {/* 项目头部 */}
       <header className="mb-8">
-        <h1 className="text-3xl font-bold mb-4">{metadata.name}</h1>
+        <h1 className="text-3xl font-bold mb-4">{display.name}</h1>
         <PreviewDescription text={metadata.description} className="text-lg text-[var(--color-gray)] mb-4" />
 
         {/* 链接按钮 */}
@@ -55,6 +59,12 @@ export function ProjectPreview({ metadata, content, embedded = false }: ProjectP
             </a>
           )}
         </div>
+
+        {!metadata.github && (
+          <p className="mb-6 text-sm text-[var(--color-danger)]">
+            缺少 GitHub 地址，发布页不会显示 GitHub 按钮。
+          </p>
+        )}
 
         {/* 标签 */}
         <PreviewTagList tags={metadata.tags} className="mb-6" />

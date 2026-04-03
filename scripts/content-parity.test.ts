@@ -2,7 +2,10 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { getBuiltinTemplates } from '../src/services/contentTemplates';
 import { parseMarkdownContent, parseRoadmapItemsFromContent } from '../src/services/contentParser';
+import { prepareDocumentSave } from '../src/services/documentPersistence';
 import { resolveImageDimensions } from '../src/components/preview/imageDimensions';
+import { combineIssueMessages } from '../src/services/previewIssues';
+import type { EditorFile, NoteMetadata, ProjectMetadata } from '../src/types/content';
 
 test('roadmap 内置模板生成的任务优先级语法可被解析器正确识别', () => {
   const template = getBuiltinTemplates('roadmap')[0].buildContent('一致性修复');
@@ -76,6 +79,115 @@ tags: [契约]
     demo: undefined,
     date: undefined,
   });
+});
+
+test('frontmatter YAML 语法错误会被显式暴露，且 note 不再偷偷补今天日期', () => {
+  const raw = `---
+title: [broken
+---
+
+正文
+`;
+
+  const parsed = parseMarkdownContent(raw, 'note');
+
+  assert.equal(parsed.hasFrontmatter, true);
+  assert.equal((parsed.metadata as { date?: string }).date, '');
+  assert.equal(Array.isArray((parsed as { issues?: string[] }).issues), true);
+  assert.match((parsed as { issues?: string[] }).issues?.[0] || '', /frontmatter|YAML/i);
+});
+
+test('无 frontmatter 的 note / graph 不再合成默认发布日期', () => {
+  const note = parseMarkdownContent('# 标题\n\n正文', 'note');
+  const graph = parseMarkdownContent('```graph\n{"nodes":[],"edges":[]}\n```', 'graph');
+
+  assert.equal((note.metadata as { date?: string }).date, '');
+  assert.equal((graph.metadata as { date?: string }).date, undefined);
+});
+
+test('roadmap 非法 status 会归一到 active，并明确记录契约错误', () => {
+  const raw = `---
+title: 契约清理
+status: archived
+---
+
+- [ ] 检查契约 \`high\`
+`;
+
+  const parsed = parseMarkdownContent(raw, 'roadmap');
+
+  assert.equal((parsed.metadata as { status?: string }).status, 'active');
+  assert.equal(Array.isArray((parsed as { issues?: string[] }).issues), true);
+  assert.match((parsed as { issues?: string[] }).issues?.join('\n') || '', /status/i);
+});
+
+test('frontmatter 非字符串文本字段不会被强转为 [object Object]，保存时也不会写回该字符串', () => {
+  const noteRaw = `---
+title:
+  bad: 1
+excerpt:
+  nested: true
+tags: [契约]
+---
+
+正文
+`;
+  const noteParsed = parseMarkdownContent(noteRaw, 'note');
+  const noteMetadata = noteParsed.metadata as NoteMetadata;
+
+  assert.equal(noteMetadata.title, '');
+  assert.equal(noteMetadata.excerpt, '');
+
+  const prepared = prepareDocumentSave({
+    path: '/workspace/content/notes/contract.md',
+    name: 'contract.md',
+    type: 'note',
+    content: noteParsed.content,
+    metadata: {
+      ...noteMetadata,
+      tags: ['契约', '已保存'],
+    },
+    issues: noteParsed.issues,
+    frontmatterRaw: noteParsed.frontmatterRaw,
+    frontmatterBlock: noteParsed.frontmatterBlock ?? undefined,
+    metadataDirty: true,
+    isDirty: true,
+    hasFrontmatter: noteParsed.hasFrontmatter,
+    hasBom: noteParsed.hasBom,
+    lineEnding: noteParsed.lineEnding,
+  } satisfies EditorFile);
+
+  assert.doesNotMatch(prepared.fileContent, /\[object Object\]/);
+  assert.match(prepared.fileContent, /tags:/);
+
+  const projectRaw = `---
+name:
+  zh: 项目
+description:
+  short: 描述
+github:
+  url: https://github.com/example/repo
+demo:
+  url: https://example.com
+---
+
+正文
+`;
+  const projectParsed = parseMarkdownContent(projectRaw, 'project');
+  const projectMetadata = projectParsed.metadata as ProjectMetadata;
+
+  assert.equal(projectMetadata.name, '');
+  assert.equal(projectMetadata.description, '');
+  assert.equal(projectMetadata.github, '');
+  assert.equal(projectMetadata.demo, undefined);
+});
+
+test('预览错误合并会同时保留 frontmatter issues 和内容解析错误', () => {
+  assert.equal(
+    combineIssueMessages(['note frontmatter 错误'], 'graph 数据格式无效'),
+    'note frontmatter 错误\ngraph 数据格式无效'
+  );
+  assert.equal(combineIssueMessages([], undefined), undefined);
 });
 
 test('编辑器图片尺寸解析与 JasBlog 对齐', () => {
