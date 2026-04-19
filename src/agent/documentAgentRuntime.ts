@@ -111,7 +111,7 @@ export class DocumentAgentRuntime {
       );
     }
 
-    this.startSession({
+    await this.startSession({
       actionName: 'save_active_document',
       actor: input.actor,
       goal: `保存文档 ${input.resource.name}`,
@@ -241,7 +241,7 @@ export class DocumentAgentRuntime {
       );
     }
 
-    this.startSession({
+    await this.startSession({
       actionName: 'delete_workspace_document',
       actor: input.actor,
       goal: `删除文档 ${input.resource.name}`,
@@ -352,9 +352,15 @@ export class DocumentAgentRuntime {
       );
     }
 
-    approval.status = 'approved';
-    approval.resolvedAt = this.now();
-    approval.resolvedBy = input.actor;
+    const approvedApproval: AgentApproval = {
+      ...approval,
+      status: 'approved',
+      resolvedAt: this.now(),
+      resolvedBy: input.actor,
+    };
+    this.approvals = this.approvals.map((item) =>
+      item.id === approval.id ? approvedApproval : item
+    );
 
     this.updateSession({
       status: 'active',
@@ -491,9 +497,15 @@ export class DocumentAgentRuntime {
       );
     }
 
-    approval.status = 'rejected';
-    approval.resolvedAt = this.now();
-    approval.resolvedBy = input.actor;
+    const rejectedApproval: AgentApproval = {
+      ...approval,
+      status: 'rejected',
+      resolvedAt: this.now(),
+      resolvedBy: input.actor,
+    };
+    this.approvals = this.approvals.map((item) =>
+      item.id === approval.id ? rejectedApproval : item
+    );
 
     this.updateSession({
       status: 'aborted',
@@ -524,7 +536,7 @@ export class DocumentAgentRuntime {
       reason: input.reason || '审批被拒绝',
     });
 
-    return this.commandResult(true, cloneApproval(approval));
+    return this.commandResult(true, cloneApproval(rejectedApproval));
   }
 
   async pauseSession(input: { actor: string }): Promise<AgentCommandResult<null>> {
@@ -622,9 +634,15 @@ export class DocumentAgentRuntime {
       ? this.approvals.find((approval) => approval.id === this.session?.pendingApprovalId)
       : null;
     if (pendingApproval && pendingApproval.status === 'requested') {
-      pendingApproval.status = 'expired';
-      pendingApproval.resolvedAt = this.now();
-      pendingApproval.resolvedBy = input.actor;
+      const expiredApproval: AgentApproval = {
+        ...pendingApproval,
+        status: 'expired',
+        resolvedAt: this.now(),
+        resolvedBy: input.actor,
+      };
+      this.approvals = this.approvals.map((item) =>
+        item.id === pendingApproval.id ? expiredApproval : item
+      );
       await this.emit({
         type: 'workspace.approval.expired',
         sessionId,
@@ -663,7 +681,7 @@ export class DocumentAgentRuntime {
     return this.commandResult(true, null);
   }
 
-  private startSession(params: {
+  private async startSession(params: {
     actionName: AgentSession['actionName'];
     actor: string;
     goal: string;
@@ -688,7 +706,7 @@ export class DocumentAgentRuntime {
         stepLabel: params.stepLabel,
       },
     };
-    void this.emit({
+    await this.emit({
       type: 'agent.session.started',
       sessionId: this.session.id,
       actor: params.actor,

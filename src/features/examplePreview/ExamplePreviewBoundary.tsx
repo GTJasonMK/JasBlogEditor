@@ -32,11 +32,11 @@ export class PreviewErrorBoundary extends Component<
   render() {
     if (this.state.error) {
       return (
-        <div className="rounded-lg border border-[var(--color-danger)]/30 bg-[var(--color-danger)]/5 p-4 text-sm">
-          <p className="font-medium text-[var(--color-danger)]">
+        <div className="min-w-0 break-words rounded-lg border border-[var(--color-danger)]/30 bg-[var(--color-danger)]/5 p-4 text-sm">
+          <p className="break-words font-medium text-[var(--color-danger)]">
             预览渲染失败
           </p>
-          <p className="mt-2 text-[var(--color-text-muted)]">
+          <p className="mt-2 break-words text-[var(--color-text-muted)]">
             {this.state.error.message}
           </p>
         </div>
@@ -56,18 +56,18 @@ export function ExamplePreviewErrorState({
 }) {
   return (
     <div className="flex h-full items-center justify-center bg-[var(--color-bg)] p-6">
-      <div className="w-full max-w-xl rounded-2xl border border-[var(--color-danger)]/25 bg-[var(--color-paper)] p-6 shadow-sm">
-        <p className="text-sm font-semibold text-[var(--color-danger)]">
+      <div className="min-w-0 w-full max-w-xl rounded-2xl border border-[var(--color-danger)]/25 bg-[var(--color-paper)] p-6 shadow-sm">
+        <p className="break-words text-sm font-semibold text-[var(--color-danger)]">
           无法打开示例预览
         </p>
-        <p className="mt-3 text-sm text-[var(--color-text-muted)]">{reason}</p>
-        <div className="mt-4">
-          <p className="text-xs uppercase tracking-[0.18em] text-[var(--color-text-subtle)]">
+        <p className="mt-3 break-words text-sm text-[var(--color-text-muted)]">{reason}</p>
+        <div className="mt-4 min-w-0">
+          <p className="break-words text-xs uppercase tracking-[0.18em] text-[var(--color-text-subtle)]">
             可用示例
           </p>
-          <ul className="mt-2 space-y-1 text-sm text-[var(--color-text)]">
+          <ul className="mt-2 break-words space-y-1 text-sm text-[var(--color-text)]">
             {FRONTMATTER_HELP_EXAMPLES.map((example) => (
-              <li key={example.id}>
+              <li key={example.id} className="break-words">
                 {example.id} · {example.title}
               </li>
             ))}

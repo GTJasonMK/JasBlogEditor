@@ -1,3 +1,5 @@
+[根目录](../CLAUDE.md) > **JasBlogEditor**
+
 # CLAUDE.md
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
@@ -204,3 +206,9 @@ Zustand store 使用异步命令模式调用 Tauri，不可变更新：
 **问题**: 知识图谱组件使用 `bg-white` 硬编码，深色主题下显示异常。
 **方案**: 替换为 `bg-[var(--color-paper)]`。
 **教训**: 所有组件必须使用 CSS 变量，从其他项目复制的组件要检查硬编码颜色。
+
+## 变更记录 (Changelog)
+
+| 时间 | 操作 | 说明 |
+|------|------|------|
+| 2026-04-16 | 增量更新 | 添加面包屑导航和变更记录，纳入根级架构文档体系 |

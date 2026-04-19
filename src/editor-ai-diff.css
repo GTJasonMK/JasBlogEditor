@@ -1,0 +1,196 @@
+.editor-codemirror .cm-ai-removed-range {
+  color: var(--color-danger);
+  text-decoration: line-through;
+  text-decoration-thickness: 1.5px;
+  background: rgba(220, 38, 38, 0.12);
+  border-radius: 4px;
+}
+
+.editor-codemirror .cm-ai-added-inline {
+  display: inline-block;
+  margin-left: 0.18rem;
+  padding: 0 0.28rem;
+  border-radius: 4px;
+  background: rgba(22, 163, 74, 0.16);
+  color: #166534;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.editor-codemirror .cm-ai-diff-unified {
+  display: flex;
+  flex-direction: column;
+  margin: 0;
+  padding: 0;
+  border-left: 3px solid rgba(148, 163, 184, 0.45);
+  border-radius: 0;
+  overflow: hidden;
+  font-variant-ligatures: none;
+}
+
+.editor-codemirror .cm-ai-diff-line {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.4rem;
+  padding: 0.1rem 0.55rem;
+  line-height: 1.5;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.editor-codemirror .cm-ai-diff-line + .cm-ai-diff-line {
+  border-top: 1px solid rgba(148, 163, 184, 0.16);
+}
+
+.editor-codemirror .cm-ai-diff-line-sign {
+  flex: none;
+  width: 0.9rem;
+  font-weight: 700;
+  text-align: center;
+  user-select: none;
+}
+
+.editor-codemirror .cm-ai-diff-line-content {
+  min-width: 0;
+  flex: 1 1 auto;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.editor-codemirror .cm-ai-diff-line-remove {
+  background: rgba(220, 38, 38, 0.1);
+  color: #991b1b;
+}
+
+.editor-codemirror .cm-ai-diff-line-remove .cm-ai-diff-line-sign {
+  color: #b91c1c;
+}
+
+.editor-codemirror .cm-ai-diff-line-remove .cm-ai-diff-line-content {
+  text-decoration: line-through;
+  text-decoration-thickness: 1.2px;
+  text-decoration-color: rgba(185, 28, 28, 0.6);
+}
+
+.editor-codemirror .cm-ai-diff-line-add {
+  background: rgba(22, 163, 74, 0.1);
+  color: #166534;
+}
+
+.editor-codemirror .cm-ai-diff-line-add .cm-ai-diff-line-sign {
+  color: #15803d;
+}
+
+.editor-codemirror .cm-ai-streaming-progress {
+  border-radius: 4px;
+  background: rgba(22, 163, 74, 0.12);
+  box-shadow: inset 0 -2px 0 rgba(22, 163, 74, 0.34);
+}
+
+.editor-codemirror .cm-ai-streaming-progress-line {
+  background:
+    linear-gradient(
+      90deg,
+      rgba(22, 163, 74, 0.18) 0,
+      rgba(22, 163, 74, 0.08) 18px,
+      transparent 72px
+    );
+  box-shadow: inset 3px 0 0 rgba(22, 163, 74, 0.72);
+}
+
+.editor-codemirror .cm-ai-streaming-frontier {
+  display: inline-block;
+  width: 3px;
+  height: 1.15em;
+  margin-left: 0.16rem;
+  vertical-align: text-bottom;
+  border-radius: 999px;
+  background: rgba(22, 163, 74, 0.82);
+  box-shadow: 0 0 0 1px rgba(22, 163, 74, 0.18);
+  animation: aiFrontierPulse 1s ease-in-out infinite;
+}
+
+@keyframes aiFrontierPulse {
+  0%, 100% {
+    opacity: 0.42;
+    transform: scaleY(0.92);
+  }
+
+  50% {
+    opacity: 1;
+    transform: scaleY(1);
+  }
+}
+
+/* ===== 整行变色：仅用于 inline 单行替换场景 ===== */
+.editor-codemirror .cm-line.cm-ai-diff-line-changed {
+  background: rgba(220, 38, 38, 0.06);
+  box-shadow: inset 3px 0 0 rgba(220, 38, 38, 0.4);
+}
+
+/* ===== 左侧 gutter 行标记 ===== */
+.editor-codemirror .cm-gutters .cm-ai-diff-gutter {
+  display: block;
+  width: 4px;
+  padding: 0;
+  background: transparent;
+  border-right: none;
+}
+
+.editor-codemirror .cm-gutters:has(.cm-ai-diff-gutter) {
+  display: flex !important;
+  background: transparent !important;
+  border-right: none !important;
+}
+
+.editor-codemirror .cm-ai-diff-gutter .cm-gutterElement {
+  padding: 0;
+}
+
+.editor-codemirror .cm-ai-diff-gutter-marker {
+  width: 4px;
+  height: 100%;
+  min-height: 1.1em;
+  background: var(--color-danger, #dc2626);
+  border-radius: 2px;
+}
+
+.editor-codemirror .cm-ai-diff-gutter-spacer {
+  width: 4px;
+  height: 1.1em;
+  opacity: 0;
+}
+
+/* ===== 右侧 minimap ===== */
+.editor-codemirror .cm-ai-diff-minimap {
+  position: absolute;
+  top: 0;
+  right: 0;
+  width: 8px;
+  height: 100%;
+  pointer-events: none;
+  z-index: 4;
+}
+
+.editor-codemirror .cm-ai-diff-minimap-marker {
+  position: absolute;
+  right: 1px;
+  width: 6px;
+  height: 4px;
+  margin: 0;
+  padding: 0;
+  border: none;
+  border-radius: 2px;
+  background: rgba(220, 38, 38, 0.72);
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.06);
+  pointer-events: auto;
+  cursor: pointer;
+  transition: transform 120ms ease, background 120ms ease, width 120ms ease;
+}
+
+.editor-codemirror .cm-ai-diff-minimap-marker:hover {
+  background: rgba(220, 38, 38, 0.95);
+  width: 8px;
+  right: 0;
+  transform: translateY(-1px);
+}

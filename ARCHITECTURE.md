@@ -181,7 +181,7 @@ App 组件挂载
 ```
 用户在编辑器中输入
   |
-  MarkdownEditor: textarea.onChange --> editorStore.updateContent(newContent)
+  MarkdownEditor: CodeMirror update --> editorStore.updateContent(newContent)
   JsonEditor:     textarea.onChange --> editorStore.updateMetadata(parsed)
   元数据表单:     input.onChange   --> editorStore.updateMetadata({ field: value })
   |
@@ -360,7 +360,7 @@ Toolbar 视图切换按钮
   |
   MarkdownEditor 根据 viewMode 渲染
   |
-  +--> 'edit'     仅显示 textarea 编辑区
+  +--> 'edit'     仅显示正文编辑区（CodeMirror）
   +--> 'preview'  仅显示预览区（还原 JasBlog 页面渲染效果）
   +--> 'split'    左右分屏，左编辑右预览
 ```

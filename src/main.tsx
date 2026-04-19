@@ -6,6 +6,7 @@ import { parseRootViewFromSearch } from "@/features/examplePreview/examplePrevie
 import { useThemeEffect } from "@/hooks";
 import { useSettingsStore } from "@/store";
 import "./index.css";
+import "./editor-ai-diff.css";
 
 function ExamplePreviewRoot({ exampleId }: { exampleId: string | null }) {
   const { settings, loadSettings } = useSettingsStore();

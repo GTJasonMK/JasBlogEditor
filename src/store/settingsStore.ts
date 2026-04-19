@@ -34,6 +34,7 @@ function toRustSettings(settings: Settings): RustSettings {
       api_key: settings.llm.apiKey,
       base_url: settings.llm.baseUrl,
       model: settings.llm.model,
+      polish_concurrency: settings.llm.polishConcurrency,
     } : undefined,
   };
 }
@@ -55,6 +56,7 @@ function fromRustSettings(rust: RustSettings): Settings {
       apiKey: rust.llm.api_key,
       baseUrl: rust.llm.base_url,
       model: rust.llm.model,
+      polishConcurrency: rust.llm.polish_concurrency,
     } : undefined,
   };
 }

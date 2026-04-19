@@ -28,6 +28,13 @@ export {
   getBrowserHeaders,
 } from './apiFormatUtils';
 
+export {
+  buildAnthropicStreamHeaders,
+  buildOpenAIStreamHeaders,
+} from './requestHeaders';
+
+export { parseChatResponseText } from './responseParser';
+
 // SSE 解析
 export { parseSSEStream } from './sseParser';
 

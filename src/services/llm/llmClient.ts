@@ -26,8 +26,13 @@ import {
   buildAnthropicEndpoint,
   buildOpenaiEndpoint,
   detectApiFormat,
-  getBrowserHeaders,
 } from './apiFormatUtils';
+import {
+  buildAnthropicStreamHeaders,
+  buildOpenAIStreamHeaders,
+} from './requestHeaders';
+import { createRequestAbortHandle } from "./requestAbort";
+import { parseChatResponseText } from './responseParser';
 import { parseSSEStream } from './sseParser';
 import { logRequest, logSuccess, logError } from './requestLogger';
 
@@ -50,6 +55,27 @@ async function getFetch(): Promise<typeof globalThis.fetch> {
   } catch {
     // 非 Tauri 环境回退到全局 fetch
     return globalThis.fetch;
+  }
+}
+
+function getResponseContentType(response: Response): string {
+  return response.headers.get('content-type')?.toLowerCase() ?? '';
+}
+
+async function* readResponseChunks(
+  response: Response,
+  format: APIFormat,
+): AsyncGenerator<StreamChunk> {
+  const contentType = getResponseContentType(response);
+
+  if (response.body && contentType.includes('text/event-stream')) {
+    yield* parseSSEStream(response.body, format);
+    return;
+  }
+
+  const parsed = parseChatResponseText(await response.text(), format);
+  for (const chunk of parsed.chunks) {
+    yield chunk;
   }
 }
 
@@ -158,11 +184,7 @@ export class LLMClient {
       ? buildOpenaiEndpoint(this._baseUrl)
       : 'https://api.openai.com/v1/chat/completions';
 
-    const headers: Record<string, string> = {
-      'Content-Type': 'application/json',
-      'Authorization': `Bearer ${this._apiKey}`,
-      ...(this._simulateBrowser ? getBrowserHeaders() : {}),
-    };
+    const headers = buildOpenAIStreamHeaders(this._apiKey, this._simulateBrowser);
 
     const payload: Record<string, unknown> = {
       model,
@@ -195,19 +217,17 @@ export class LLMClient {
     let collectedContent = '';
     let chunkCount = 0;
 
+    const abortHandle = createRequestAbortHandle(timeout, params.signal);
+
     try {
       const fetchFn = await getFetch();
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), timeout * 1000);
 
       const response = await fetchFn(endpoint, {
         method: 'POST',
         headers,
         body: JSON.stringify(payload),
-        signal: controller.signal,
+        signal: abortHandle.controller.signal,
       });
-
-      clearTimeout(timeoutId);
 
       if (!response.ok) {
         const errorText = await response.text();
@@ -216,11 +236,7 @@ export class LLMClient {
         throw new Error(`OpenAI API 错误(${response.status}): ${errorMsg}`);
       }
 
-      if (!response.body) {
-        throw new Error('响应体为空，无法解析流式数据');
-      }
-
-      for await (const chunk of parseSSEStream(response.body, 'openai')) {
+      for await (const chunk of readResponseChunks(response, 'openai')) {
         if (chunk.content) {
           chunkCount++;
           collectedContent += chunk.content;
@@ -233,6 +249,10 @@ export class LLMClient {
       const errorMsg = e instanceof Error ? e.message : String(e);
       const errorName = e instanceof Error ? e.name : 'UnknownError';
       if (errorName === 'AbortError') {
+        if (params.signal?.aborted) {
+          await logError(logEntry, 'AbortError', '请求已取消');
+          throw e;
+        }
         await logError(logEntry, 'TimeoutError', `请求超时(${timeout}秒)`);
         throw new Error(`OpenAI API 请求超时(${timeout}秒)`);
       }
@@ -240,6 +260,8 @@ export class LLMClient {
         await logError(logEntry, errorName, errorMsg);
       }
       throw e;
+    } finally {
+      abortHandle.dispose();
     }
   }
 
@@ -251,18 +273,14 @@ export class LLMClient {
     format: APIFormat,
     timeout: number,
   ): AsyncGenerator<StreamChunk> {
-    if (!this._baseUrl) {
-      throw new Error('Anthropic 格式必须提供 base_url（官方 API 或中转站地址）');
-    }
+    const endpoint = this._baseUrl
+      ? buildAnthropicEndpoint(this._baseUrl)
+      : buildAnthropicEndpoint('https://api.anthropic.com');
 
-    const endpoint = buildAnthropicEndpoint(this._baseUrl);
-
-    const headers: Record<string, string> = {
-      'Content-Type': 'application/json',
-      'Authorization': `Bearer ${this._apiKey}`,
-      'anthropic-version': '2023-06-01',
-      ...(this._simulateBrowser ? getBrowserHeaders() : {}),
-    };
+    const headers = buildAnthropicStreamHeaders(
+      this._apiKey,
+      this._simulateBrowser
+    );
 
     // Anthropic 格式：system 消息单独传递
     let systemContent: string | undefined;
@@ -300,26 +318,24 @@ export class LLMClient {
       temperature: params.temperature,
       maxTokens: params.maxTokens,
       timeout,
-      baseUrl: this._baseUrl,
+      baseUrl: this._baseUrl || 'https://api.anthropic.com',
       apiKey: this._apiKey,
     });
 
     let collectedContent = '';
     let chunkCount = 0;
 
+    const abortHandle = createRequestAbortHandle(timeout, params.signal);
+
     try {
       const fetchFn = await getFetch();
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), timeout * 1000);
 
       const response = await fetchFn(endpoint, {
         method: 'POST',
         headers,
         body: JSON.stringify(payload),
-        signal: controller.signal,
+        signal: abortHandle.controller.signal,
       });
-
-      clearTimeout(timeoutId);
 
       if (!response.ok) {
         const errorText = await response.text();
@@ -328,11 +344,7 @@ export class LLMClient {
         throw new Error(`Anthropic API 错误(${response.status}): ${errorMsg}`);
       }
 
-      if (!response.body) {
-        throw new Error('响应体为空，无法解析流式数据');
-      }
-
-      for await (const chunk of parseSSEStream(response.body, 'anthropic')) {
+      for await (const chunk of readResponseChunks(response, 'anthropic')) {
         if (chunk.content) {
           chunkCount++;
           collectedContent += chunk.content;
@@ -345,6 +357,10 @@ export class LLMClient {
       const errorMsg = e instanceof Error ? e.message : String(e);
       const errorName = e instanceof Error ? e.name : 'UnknownError';
       if (errorName === 'AbortError') {
+        if (params.signal?.aborted) {
+          await logError(logEntry, 'AbortError', '请求已取消');
+          throw e;
+        }
         await logError(logEntry, 'TimeoutError', `请求超时(${timeout}秒)`);
         throw new Error(`Anthropic API 请求超时(${timeout}秒)`);
       }
@@ -352,6 +368,8 @@ export class LLMClient {
         await logError(logEntry, errorName, errorMsg);
       }
       throw e;
+    } finally {
+      abortHandle.dispose();
     }
   }
 }

@@ -51,6 +51,8 @@
 /* 段落和文本 */
 .prose-chinese p {
   margin-bottom: 1.2em;
+  overflow-wrap: anywhere;
+  word-break: break-word;
 }
 
 .prose-chinese strong {
@@ -73,6 +75,8 @@
   text-decoration: underline;
   text-underline-offset: 2px;
   transition: color 0.2s;
+  overflow-wrap: anywhere;
+  word-break: break-word;
 }
 
 .prose-chinese a:hover {
@@ -94,6 +98,8 @@
 
 .prose-chinese li {
   margin-bottom: 0.4em;
+  overflow-wrap: anywhere;
+  word-break: break-word;
 }
 
 .prose-chinese li > ul,
@@ -127,6 +133,8 @@
   background-color: var(--color-paper-dark);
   border-radius: 0 8px 8px 0;
   color: var(--color-text-muted);
+  overflow-wrap: anywhere;
+  word-break: break-word;
 }
 
 .prose-chinese blockquote p {
@@ -144,6 +152,8 @@
   border-radius: 4px;
   font-size: 0.9em;
   font-family: "Fira Code", "JetBrains Mono", Consolas, monospace;
+  overflow-wrap: anywhere;
+  word-break: break-word;
 }
 
 /* 代码块 */
@@ -179,11 +189,17 @@
   text-align: left;
   padding: 0.75em 1em;
   border: 1px solid var(--color-paper-darker);
+  vertical-align: top;
+  overflow-wrap: anywhere;
+  word-break: break-word;
 }
 
 .prose-chinese td {
   padding: 0.75em 1em;
   border: 1px solid var(--color-paper-darker);
+  vertical-align: top;
+  overflow-wrap: anywhere;
+  word-break: break-word;
 }
 
 .prose-chinese tr:nth-child(even) {

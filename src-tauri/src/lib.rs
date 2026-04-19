@@ -41,6 +41,7 @@ pub struct LLMSettings {
     pub api_key: Option<String>,
     pub base_url: Option<String>,
     pub model: Option<String>,
+    pub polish_concurrency: Option<u32>,
 }
 
 // 设置结构体

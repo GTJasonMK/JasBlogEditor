@@ -10,16 +10,27 @@ import { type GraphData } from "@/types";
 
 interface GraphViewerProps {
   data: GraphData;
+  heightClassName?: string;
+  panelWidthClassName?: string;
 }
 
-export default function GraphViewer({ data }: GraphViewerProps) {
+export default function GraphViewer({
+  data,
+  heightClassName = "h-[600px]",
+  panelWidthClassName = "xl:w-[320px]",
+}: GraphViewerProps) {
   const [selectedNode, setSelectedNode] = useState<Node | null>(null);
   const [showMinimap, setShowMinimap] = useState(true);
+  const panelClassName = `w-full xl:w-[320px] flex-shrink-0 rounded-lg overflow-hidden border border-[var(--color-border)] ${panelWidthClassName}`.replace(
+    "xl:w-[320px] xl:w-[320px]",
+    "xl:w-[320px]"
+  );
 
   return (
-    <div className="flex gap-4 h-[600px]">
-      {/* 图谱画布区域 - 自适应宽度 */}
-      <div className="flex-1 relative rounded-lg overflow-hidden border border-[var(--color-border)]">
+    <div className="flex flex-col gap-4 xl:flex-row">
+      <div
+        className={`relative min-h-[320px] flex-1 rounded-lg overflow-hidden border border-[var(--color-border)] ${heightClassName}`}
+      >
         <GraphCanvas
           data={data}
           selectedNode={selectedNode}
@@ -27,16 +38,13 @@ export default function GraphViewer({ data }: GraphViewerProps) {
           showMinimap={showMinimap}
         />
 
-        {/* 左上角信息区域 */}
         <div className="absolute top-4 left-4 flex flex-col gap-2 z-10">
-          {/* 统计信息 */}
           <div className="bg-white/90 backdrop-blur-sm rounded-lg px-3 py-2 text-sm border border-[var(--color-border)] shadow-sm">
             <span className="text-[var(--color-gray)]">
               {data.nodes.length} 个节点 · {data.edges.length} 条连接
             </span>
           </div>
 
-          {/* 提示信息 */}
           {!selectedNode && (
             <div className="bg-white/90 backdrop-blur-sm rounded-lg px-3 py-2 text-sm border border-[var(--color-border)] shadow-sm">
               <span className="text-[var(--color-gray)]">
@@ -46,7 +54,6 @@ export default function GraphViewer({ data }: GraphViewerProps) {
           )}
         </div>
 
-        {/* 小地图切换按钮 */}
         <button
           onClick={() => setShowMinimap(!showMinimap)}
           className="absolute bottom-4 right-4 bg-white/90 backdrop-blur-sm rounded-lg px-3 py-2 text-sm border border-[var(--color-border)] shadow-sm z-10 hover:bg-white transition-colors"
@@ -58,9 +65,8 @@ export default function GraphViewer({ data }: GraphViewerProps) {
         </button>
       </div>
 
-      {/* 详情面板 - 固定宽度 */}
       {selectedNode && (
-        <div className="w-[320px] flex-shrink-0 rounded-lg overflow-hidden border border-[var(--color-border)]">
+        <div className={panelClassName}>
           <NodeDetailPanel
             node={selectedNode}
             onClose={() => setSelectedNode(null)}

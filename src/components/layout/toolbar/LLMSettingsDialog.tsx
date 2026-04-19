@@ -12,6 +12,9 @@ export function LLMSettingsDialog({ onClose }: LLMSettingsDialogProps) {
   const [apiKey, setApiKey] = useState(settings.llm?.apiKey || '');
   const [baseUrl, setBaseUrl] = useState(settings.llm?.baseUrl || '');
   const [model, setModel] = useState(settings.llm?.model || '');
+  const [polishConcurrency, setPolishConcurrency] = useState<string>(
+    settings.llm?.polishConcurrency ? String(settings.llm.polishConcurrency) : '3',
+  );
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [testStatus, setTestStatus] = useState<'idle' | 'testing' | 'success' | 'error'>('idle');
   const [testMessage, setTestMessage] = useState('');
@@ -21,15 +24,24 @@ export function LLMSettingsDialog({ onClose }: LLMSettingsDialogProps) {
     setApiKey(settings.llm?.apiKey || '');
     setBaseUrl(settings.llm?.baseUrl || '');
     setModel(settings.llm?.model || '');
+    setPolishConcurrency(
+      settings.llm?.polishConcurrency ? String(settings.llm.polishConcurrency) : '3',
+    );
   }, [settings.llm]);
 
   const handleSave = async () => {
     setIsSubmitting(true);
     try {
+      const parsedConcurrency = parseInt(polishConcurrency, 10);
+      const clampedConcurrency = Number.isFinite(parsedConcurrency)
+        ? Math.max(1, Math.min(10, parsedConcurrency))
+        : 3;
+
       await saveLLMSettings({
         apiKey: apiKey.trim() || undefined,
         baseUrl: baseUrl.trim() || undefined,
         model: model.trim() || undefined,
+        polishConcurrency: clampedConcurrency,
       });
       onClose();
     } finally {
@@ -131,6 +143,26 @@ export function LLMSettingsDialog({ onClose }: LLMSettingsDialogProps) {
             />
             <p className="text-xs text-[var(--color-text-muted)] mt-1">
               含"claude"字样自动使用 Anthropic 格式，其余使用 OpenAI 格式
+            </p>
+          </div>
+
+          <div>
+            <label className="block text-xs text-[var(--color-text-muted)] mb-1">
+              润色并发数（1-10）
+            </label>
+            <input
+              type="number"
+              min={1}
+              max={10}
+              step={1}
+              value={polishConcurrency}
+              onChange={(e) => setPolishConcurrency(e.target.value)}
+              placeholder="3"
+              className="w-full px-3 py-2 border border-[var(--color-border)] rounded-md focus:outline-none focus:border-[var(--color-primary)] bg-[var(--color-bg)] text-[var(--color-text)]"
+              onKeyDown={handleKeyDown}
+            />
+            <p className="text-xs text-[var(--color-text-muted)] mt-1">
+              整篇润色时分块并发调用 LLM 的最大并发数。数字越大越快，但会占用更多 API 配额
             </p>
           </div>
         </div>

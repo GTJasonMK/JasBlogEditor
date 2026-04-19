@@ -14,6 +14,7 @@ import { GraphPreview } from "@/components/preview/previews/GraphPreview";
 import { NotePreview } from "@/components/preview/previews/NotePreview";
 import { ProjectPreview } from "@/components/preview/previews/ProjectPreview";
 import { RoadmapPreview } from "@/components/preview/previews/RoadmapPreview";
+import type { PreviewLayout } from "@/components/preview/previewLayout";
 import type { FrontmatterHelpExample } from "@/components/layout/toolbar/help/frontmatterHelpData";
 
 const DIARY_HELP_FILE_PATH = "content/diary/2026/04/2026-04-03-22-10-review.md";
@@ -22,11 +23,13 @@ const NOTE_HELP_FILE_NAME = "react-state-sync-note.md";
 const PROJECT_HELP_FILE_NAME = "demo-project.md";
 const ROADMAP_HELP_FILE_NAME = "study-roadmap.md";
 const GRAPH_HELP_FILE_NAME = "knowledge-graph.md";
-const HELP_FRAME_CLASS = "max-h-[520px] overflow-auto";
+const HELP_FRAME_CLASS = "min-w-0 min-h-0";
+const HELP_GRAPH_FRAME_CLASS = "min-w-0 min-h-[420px]";
 
 function renderNotePreview(
   parsed: ReturnType<typeof parseMarkdownContent>,
-  frameClassName: string
+  frameClassName: string,
+  layout: PreviewLayout
 ) {
   return (
     <div className={frameClassName}>
@@ -35,6 +38,7 @@ function renderNotePreview(
         metadata={parsed.metadata as NoteMetadata}
         content={parsed.content}
         embedded
+        layout={layout}
       />
     </div>
   );
@@ -42,7 +46,8 @@ function renderNotePreview(
 
 function renderDiaryPreview(
   parsed: ReturnType<typeof parseMarkdownContent>,
-  frameClassName: string
+  frameClassName: string,
+  layout: PreviewLayout
 ) {
   return (
     <div className={frameClassName}>
@@ -53,6 +58,7 @@ function renderDiaryPreview(
         content={parsed.content}
         aggregateByDay={false}
         embedded
+        layout={layout}
       />
     </div>
   );
@@ -60,7 +66,8 @@ function renderDiaryPreview(
 
 function renderProjectPreview(
   parsed: ReturnType<typeof parseMarkdownContent>,
-  frameClassName: string
+  frameClassName: string,
+  layout: PreviewLayout
 ) {
   return (
     <div className={frameClassName}>
@@ -69,6 +76,7 @@ function renderProjectPreview(
         metadata={parsed.metadata as ProjectMetadata}
         content={parsed.content}
         embedded
+        layout={layout}
       />
     </div>
   );
@@ -76,7 +84,8 @@ function renderProjectPreview(
 
 function renderRoadmapPreview(
   parsed: ReturnType<typeof parseMarkdownContent>,
-  frameClassName: string
+  frameClassName: string,
+  layout: PreviewLayout
 ) {
   return (
     <div className={frameClassName}>
@@ -85,6 +94,7 @@ function renderRoadmapPreview(
         metadata={parsed.metadata as RoadmapMetadata}
         content={parsed.content}
         embedded
+        layout={layout}
       />
     </div>
   );
@@ -92,7 +102,8 @@ function renderRoadmapPreview(
 
 function renderGraphPreview(
   parsed: ReturnType<typeof parseMarkdownContent>,
-  frameClassName: string
+  frameClassName: string,
+  layout: PreviewLayout
 ) {
   return (
     <div className={frameClassName}>
@@ -101,6 +112,7 @@ function renderGraphPreview(
         metadata={parsed.metadata as GraphMetadata}
         content={parsed.content}
         embedded
+        layout={layout}
       />
     </div>
   );
@@ -108,13 +120,15 @@ function renderGraphPreview(
 
 function renderDocPreview(
   parsed: ReturnType<typeof parseMarkdownContent>,
-  frameClassName: string
+  frameClassName: string,
+  layout: PreviewLayout
 ) {
   return (
     <div className={frameClassName}>
       <DocPreview
         metadata={parsed.metadata as DocMetadata}
         content={parsed.content}
+        layout={layout}
       />
     </div>
   );
@@ -131,29 +145,31 @@ export function FrontmatterHelpExamplePreview({
     () => parseMarkdownContent(example.raw, example.type),
     [example.raw, example.type]
   );
-  const frameClassName = variant === "window" ? "min-h-full" : HELP_FRAME_CLASS;
+  const layout: PreviewLayout = "pane";
+  const frameClassName =
+    variant === "window" ? "min-w-0 min-h-full" : HELP_FRAME_CLASS;
   const graphFrameClassName =
-    variant === "window" ? "min-h-full" : "h-[680px] overflow-hidden";
+    variant === "window" ? "min-w-0 min-h-full" : HELP_GRAPH_FRAME_CLASS;
 
   if (example.type === "note") {
-    return renderNotePreview(parsed, frameClassName);
+    return renderNotePreview(parsed, frameClassName, layout);
   }
 
   if (example.type === "diary") {
-    return renderDiaryPreview(parsed, frameClassName);
+    return renderDiaryPreview(parsed, frameClassName, layout);
   }
 
   if (example.type === "project") {
-    return renderProjectPreview(parsed, frameClassName);
+    return renderProjectPreview(parsed, frameClassName, layout);
   }
 
   if (example.type === "roadmap") {
-    return renderRoadmapPreview(parsed, frameClassName);
+    return renderRoadmapPreview(parsed, frameClassName, layout);
   }
 
   if (example.type === "graph") {
-    return renderGraphPreview(parsed, graphFrameClassName);
+    return renderGraphPreview(parsed, graphFrameClassName, layout);
   }
 
-  return renderDocPreview(parsed, frameClassName);
+  return renderDocPreview(parsed, frameClassName, layout);
 }

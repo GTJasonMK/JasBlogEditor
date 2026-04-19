@@ -81,6 +81,7 @@ export function prepareDocumentSave(currentFile: EditorFile): PreparedDocumentSa
     fileContent,
     nextFile: {
       ...currentFile,
+      content: reparsed.content,
       metadata: nextMetadata,
       isDirty: false,
       metadataDirty: false,

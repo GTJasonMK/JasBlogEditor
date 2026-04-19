@@ -287,6 +287,7 @@ export interface LLMSettings {
   apiKey?: string;
   baseUrl?: string;
   model?: string;
+  polishConcurrency?: number;
 }
 
 // 迷你写作模式窗口配置

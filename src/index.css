@@ -1,6 +1,8 @@
 /* 字体说明：使用系统字体，不依赖 Google Fonts（桌面应用无需外部网络字体） */
 
-@import "tailwindcss";
+/* 关闭自动源码扫描，避免在 /mnt/e 挂载盘上遍历整个仓库（尤其是 src-tauri/target）。 */
+@import "tailwindcss" source(none);
+@source "./";
 
 @theme {
   /* 主色调 - 朱砂色（与 JasBlog 保持一致） */
@@ -169,6 +171,23 @@ a {
 
 .editor-textarea:focus {
   outline: none;
+}
+
+.editor-codemirror {
+  height: 100%;
+  min-height: 0;
+}
+
+.editor-codemirror .cm-editor {
+  height: 100%;
+}
+
+.editor-codemirror .cm-scroller {
+  overflow: auto;
+}
+
+.editor-codemirror .cm-activeLine {
+  background: transparent;
 }
 
 /* 动画 */

@@ -116,7 +116,7 @@ function ExamplePreviewLayout({
   }, [currentExample.id]);
 
   return (
-    <div className="flex h-full flex-col overflow-hidden bg-[var(--color-bg)]">
+    <div className="min-w-0 flex h-full flex-col overflow-hidden bg-[var(--color-bg)]">
       <ExamplePreviewToolbar
         currentExample={currentExample}
         syncScroll={syncScroll}
@@ -136,16 +136,16 @@ function ExamplePreviewLayout({
         onToggleSyncScroll={onToggleSyncScroll}
         onClose={onClose}
       />
-      <main className="grid min-h-0 flex-1 gap-4 overflow-hidden bg-[linear-gradient(180deg,var(--color-bg),var(--color-surface))] p-4 lg:grid-cols-2">
+      <main className="min-w-0 grid min-h-0 flex-1 gap-4 overflow-hidden bg-[linear-gradient(180deg,var(--color-bg),var(--color-surface))] p-4 lg:grid-cols-2">
         <ExamplePreviewPane title="原始文档">
-          <div ref={leftPaneRef} className="min-h-0 flex-1 overflow-auto p-4">
+          <div ref={leftPaneRef} className="min-w-0 min-h-0 flex-1 overflow-auto p-4">
             <pre className="editor-textarea whitespace-pre-wrap break-words text-sm text-[var(--color-text)]">
               <code>{currentExample.raw}</code>
             </pre>
           </div>
         </ExamplePreviewPane>
         <ExamplePreviewPane title="渲染结果">
-          <div ref={rightPaneRef} className="min-h-0 flex-1 overflow-auto p-4">
+          <div ref={rightPaneRef} className="min-w-0 min-h-0 flex-1 overflow-auto p-4">
             <PreviewErrorBoundary resetKey={currentExample.id}>
               <FrontmatterHelpExamplePreview
                 example={currentExample}

@@ -1,16 +1,24 @@
-import { useEffect, useMemo, useState } from 'react';
-import { invokeTauri } from '@/platform/tauri';
-import { buildDiaryEntryId, DIARY_DATE_PATTERN, type DiaryNameInference, inferDiaryFromFileName, resolveDiaryDate } from '@/services/diary';
-import { parseMarkdownContent } from '@/services/contentParser';
-import { resolveDiaryDisplay } from '@/services/displayMetadata';
-import { combineIssueMessages } from '@/services/previewIssues';
-import { useFileStore } from '@/store';
-import { collectLeafFiles, isSamePath } from '@/utils';
-import { DIARY_TIMELINE_LABEL, type DiaryMetadata } from '@/types';
-import type { FileTreeNode } from '@/store/fileStore';
-import { MarkdownRenderer } from '../MarkdownRenderer';
-import { PreviewBackButton } from '../PreviewBackButton';
-import { PreviewDate, PreviewDescription, PreviewTagList } from '../PreviewMeta';
+import { useEffect, useMemo, useState } from "react";
+import { invokeTauri } from "@/platform/tauri";
+import {
+  buildDiaryEntryId,
+  DIARY_DATE_PATTERN,
+  type DiaryNameInference,
+  inferDiaryFromFileName,
+  resolveDiaryDate,
+} from "@/services/diary";
+import { parseMarkdownContent } from "@/services/contentParser";
+import { resolveDiaryDisplay } from "@/services/displayMetadata";
+import { combineIssueMessages } from "@/services/previewIssues";
+import { useFileStore } from "@/store";
+import type { FileTreeNode } from "@/store/fileStore";
+import { DIARY_TIMELINE_LABEL, type DiaryMetadata } from "@/types";
+import { collectLeafFiles, isSamePath } from "@/utils";
+import DiaryDayView from "./diary/DiaryDayView";
+import type { DiaryDayPreview, DiaryEntryPreview } from "./diary/types";
+import type { PreviewLayout } from "../previewLayout";
+
+type DiaryEntryWithError = DiaryEntryPreview & { error?: string };
 
 interface DiaryPreviewProps {
   filePath: string;
@@ -19,50 +27,30 @@ interface DiaryPreviewProps {
   content: string;
   aggregateByDay?: boolean;
   embedded?: boolean;
+  layout?: PreviewLayout;
 }
 
-interface DiaryEntry {
-  id: string;
-  path: string;
-  title: string;
-  date: string;
-  time: string;
-  excerpt: string;
-  tags: string[];
-  mood?: string;
-  weather?: string;
-  location?: string;
-  companions: string[];
-  content: string;
-  error?: string;
-}
-
-interface DiaryDay {
-  slug: string;
-  title: string;
-  date: string;
-  excerpt: string;
-  tags: string[];
-  entryCount: number;
-  mood?: string;
-  weather?: string;
-  location?: string;
-  entries: DiaryEntry[];
-  error?: string;
-}
-
-
-function sortByTimeAsc(a: DiaryEntry, b: DiaryEntry): number {
+function sortByTimeAsc(a: DiaryEntryWithError, b: DiaryEntryWithError): number {
   if (a.time === b.time) {
     return a.id.localeCompare(b.id);
   }
+
   return a.time.localeCompare(b.time);
 }
 
-function buildDiaryDay(date: string, entries: DiaryEntry[]): DiaryDay {
+function buildDiaryDay(
+  date: string,
+  entries: DiaryEntryWithError[]
+): DiaryDayPreview {
   const sortedEntries = [...entries].sort(sortByTimeAsc);
   const latestEntry = sortedEntries[sortedEntries.length - 1];
-
+  const tags = Array.from(
+    new Set(sortedEntries.flatMap((entry) => entry.tags))
+  ).sort();
+  const excerpt =
+    latestEntry.excerpt ||
+    sortedEntries.map((entry) => entry.excerpt).find(Boolean) ||
+    "";
   const mood =
     latestEntry.mood ||
     [...sortedEntries].reverse().map((entry) => entry.mood).find(Boolean);
@@ -72,18 +60,11 @@ function buildDiaryDay(date: string, entries: DiaryEntry[]): DiaryDay {
   const location =
     latestEntry.location ||
     [...sortedEntries].reverse().map((entry) => entry.location).find(Boolean);
-
-  const tags = Array.from(new Set(sortedEntries.flatMap((entry) => entry.tags))).sort();
-  const excerpt =
-    latestEntry.excerpt ||
-    sortedEntries.map((entry) => entry.excerpt).find(Boolean) ||
-    '';
   const error = sortedEntries.map((entry) => entry.error).find(Boolean);
-  const title = sortedEntries.length === 1 ? sortedEntries[0].title : `${date} 考研日志`;
 
   return {
     slug: date,
-    title,
+    title: sortedEntries.length === 1 ? sortedEntries[0].title : `${date} 考研日志`,
     date,
     excerpt,
     tags,
@@ -96,32 +77,37 @@ function buildDiaryDay(date: string, entries: DiaryEntry[]): DiaryDay {
   };
 }
 
-// 日记预览（对齐 JasBlog /diary/[slug] 的单日详情页展示）
-// 编辑器内可在本地聚合同一天的多条记录：基于 fileTree 找到同日其他 entry，再读取并解析它们。
-export function DiaryPreview({ filePath, fileName, metadata, content, aggregateByDay = true, embedded = false }: DiaryPreviewProps) {
+export function DiaryPreview({
+  filePath,
+  fileName,
+  metadata,
+  content,
+  aggregateByDay = true,
+  embedded = false,
+  layout = 'page',
+}: DiaryPreviewProps) {
   const { fileTree, workspacePath } = useFileStore();
-
-  const fileBaseName = useMemo(() => fileName.replace(/\.md$/i, ''), [fileName]);
+  const fileBaseName = useMemo(() => fileName.replace(/\.md$/i, ""), [fileName]);
   const inferred = useMemo(() => inferDiaryFromFileName(fileBaseName), [fileBaseName]);
   const display = useMemo(
     () => resolveDiaryDisplay(fileName, metadata, inferred),
     [fileName, metadata, inferred]
   );
-  const resolvedDate = display.date;
-
   const diaryDirPath = useMemo(() => {
-    if (!workspacePath) return null;
+    if (!workspacePath) {
+      return null;
+    }
+
     return `${workspacePath}/content/diary`;
   }, [workspacePath]);
-
-  const currentEntry: DiaryEntry = useMemo(() => {
+  const currentEntry = useMemo<DiaryEntryPreview>(() => {
     return {
       id: diaryDirPath ? buildDiaryEntryId(filePath, diaryDirPath) : fileBaseName,
       path: filePath,
       title: display.title,
       date: display.date,
-      time: display.time || '00:00',
-      excerpt: metadata.excerpt || '',
+      time: display.time || "00:00",
+      excerpt: metadata.excerpt || "",
       tags: metadata.tags || [],
       mood: metadata.mood,
       weather: metadata.weather,
@@ -129,95 +115,91 @@ export function DiaryPreview({ filePath, fileName, metadata, content, aggregateB
       companions: metadata.companions || [],
       content,
     };
-  }, [
-    metadata.excerpt,
-    metadata.tags,
-    metadata.mood,
-    metadata.weather,
-    metadata.location,
-    metadata.companions,
-    fileBaseName,
-    filePath,
-    diaryDirPath,
-    content,
-    display,
-  ]);
+  }, [content, diaryDirPath, display, fileBaseName, filePath, metadata]);
 
-  const [extraEntries, setExtraEntries] = useState<DiaryEntry[]>([]);
-  const [extraLoading, setExtraLoading] = useState(false);
+  const [extraEntries, setExtraEntries] = useState<DiaryEntryPreview[]>([]);
   const [extraError, setExtraError] = useState<string | null>(null);
 
-  // 加载同一天的其他 diary entry（不包含当前文件）
   useEffect(() => {
     let cancelled = false;
 
     async function loadExtraEntries() {
       setExtraError(null);
-      setExtraLoading(false);
 
-      if (!aggregateByDay) {
+      if (!aggregateByDay || !diaryDirPath || !resolvedDate(display.date)) {
         setExtraEntries([]);
         return;
       }
 
-      if (!diaryDirPath || !workspacePath) {
-        setExtraEntries([]);
-        return;
-      }
-
-      if (!resolvedDate || !DIARY_DATE_PATTERN.test(resolvedDate)) {
-        setExtraEntries([]);
-        return;
-      }
-
-      // 找到 diary 根目录节点，然后递归收集所有叶子文件
-      const diaryRoot = fileTree.find((node) => node.isDir && node.contentType === 'diary');
+      const diaryRoot = fileTree.find(
+        (node) => node.isDir && node.contentType === "diary"
+      );
       if (!diaryRoot?.children?.length) {
         setExtraEntries([]);
         return;
       }
 
-      const leaves = collectLeafFiles(diaryRoot.children)
-        .filter((node) => node.name.toLowerCase().endsWith('.md'));
-
-      const candidates = leaves
+      const candidates = collectLeafFiles(diaryRoot.children)
+        .filter((node) => node.name.toLowerCase().endsWith(".md"))
         .map((node) => {
-          const baseName = node.name.replace(/\.md$/i, '');
-          if (isSamePath(node.path, filePath)) return null;
-          const inferred = inferDiaryFromFileName(baseName);
-          if (inferred?.date && inferred.date !== resolvedDate) return null;
-          return { node, inferred };
+          const candidateInference = inferDiaryFromFileName(
+            node.name.replace(/\.md$/i, "")
+          );
+
+          if (isSamePath(node.path, filePath)) {
+            return null;
+          }
+
+          if (
+            candidateInference?.date &&
+            candidateInference.date !== display.date
+          ) {
+            return null;
+          }
+
+          return { inferred: candidateInference, node };
         })
-        .filter((item): item is { node: FileTreeNode; inferred: DiaryNameInference | null } => item !== null);
+        .filter(
+          (
+            item
+          ): item is {
+            inferred: DiaryNameInference | null;
+            node: FileTreeNode;
+          } => item !== null
+        );
 
       if (candidates.length === 0) {
         setExtraEntries([]);
         return;
       }
 
-      setExtraLoading(true);
-
       try {
-        const loaded = await Promise.all(
-          candidates.map(async ({ node, inferred }) => {
-            const raw = await invokeTauri('read_file', { path: node.path });
-            const parsed = parseMarkdownContent(raw, 'diary');
+        const loaded: Array<DiaryEntryPreview | null> = await Promise.all(
+          candidates.map(async ({ inferred: candidateInference, node }) => {
+            const raw = await invokeTauri("read_file", { path: node.path });
+            const parsed = parseMarkdownContent(raw, "diary");
             const meta = parsed.metadata as DiaryMetadata;
+            const entryDisplay = resolveDiaryDisplay(
+              node.name,
+              meta,
+              candidateInference
+            );
+            const date = resolveDiaryDate(
+              entryDisplay.date,
+              candidateInference?.date
+            );
 
-            // frontmatter 日期无效时，回退到文件名推断日期，避免误丢可聚合条目
-            const entryDisplay = resolveDiaryDisplay(node.name, meta, inferred);
-            const date = resolveDiaryDate(entryDisplay.date, inferred?.date);
-            if (date !== resolvedDate) return null;
+            if (date !== display.date) {
+              return null;
+            }
 
-            const entryId = buildDiaryEntryId(node.path, diaryDirPath);
-
-            const entry: DiaryEntry = {
-              id: entryId,
+            return {
+              id: buildDiaryEntryId(node.path, diaryDirPath),
               path: node.path,
               title: entryDisplay.title,
               date,
-              time: entryDisplay.time || '00:00',
-              excerpt: meta.excerpt || '',
+              time: entryDisplay.time || "00:00",
+              excerpt: meta.excerpt || "",
               tags: meta.tags || [],
               mood: meta.mood,
               weather: meta.weather,
@@ -225,131 +207,51 @@ export function DiaryPreview({ filePath, fileName, metadata, content, aggregateB
               companions: meta.companions || [],
               content: parsed.content,
               error: combineIssueMessages(parsed.issues),
-            };
-
-            return entry;
+            } satisfies DiaryEntryPreview;
           })
         );
 
-        const next = loaded.filter((entry): entry is DiaryEntry => entry !== null);
-        next.sort(sortByTimeAsc);
-
         if (!cancelled) {
-          setExtraEntries(next);
+          setExtraEntries(loaded.filter((entry): entry is DiaryEntryPreview => entry !== null));
         }
       } catch (error) {
-        console.error('加载同日 diary entries 失败:', error);
+        console.error("加载同日 diary entries 失败:", error);
         if (!cancelled) {
           setExtraError(String(error));
           setExtraEntries([]);
         }
-      } finally {
-        if (!cancelled) {
-          setExtraLoading(false);
-        }
       }
     }
 
-    loadExtraEntries();
+    void loadExtraEntries();
     return () => {
       cancelled = true;
     };
-  }, [aggregateByDay, diaryDirPath, workspacePath, resolvedDate, fileTree, filePath]);
+  }, [aggregateByDay, diaryDirPath, display.date, filePath, fileTree]);
 
   const day = useMemo(() => {
-    // 没有有效日期时，回退为“单条渲染”
-    const dayDate = resolvedDate || currentEntry.date;
-    if (!dayDate || !DIARY_DATE_PATTERN.test(dayDate)) {
-      return buildDiaryDay(currentEntry.date || '', [currentEntry]);
+    const date = resolvedDate(display.date) || currentEntry.date;
+    if (!date || !DIARY_DATE_PATTERN.test(date)) {
+      return buildDiaryDay(currentEntry.date || "", [currentEntry]);
     }
 
-    const entries = [currentEntry, ...extraEntries]
-      .filter((entry) => entry.date === dayDate);
-
-    return buildDiaryDay(dayDate, entries.length > 0 ? entries : [currentEntry]);
-  }, [resolvedDate, currentEntry, extraEntries]);
-
-  const tags = day.tags || [];
+    const entries = [currentEntry, ...extraEntries].filter(
+      (entry) => entry.date === date
+    );
+    return buildDiaryDay(date, entries.length > 0 ? entries : [currentEntry]);
+  }, [currentEntry, display.date, extraEntries]);
 
   return (
-    <div className="max-w-4xl mx-auto px-6 py-12">
-      {!embedded && (
-        <PreviewBackButton label={`返回${DIARY_TIMELINE_LABEL}`} />
-      )}
-
-      <header className="mb-8">
-        <div className="flex flex-wrap items-center gap-3 mb-2">
-          <PreviewDate date={day.date} />
-          <span className="text-xs px-2 py-0.5 rounded bg-[var(--color-paper-dark)] text-[var(--color-gray)]">
-            {day.entryCount} 条记录
-          </span>
-          {day.mood && <span className="tag">{day.mood}</span>}
-          {day.weather && <span className="tag">{day.weather}</span>}
-          {day.location && <span className="tag">{day.location}</span>}
-          {extraLoading && (
-            <span className="text-xs px-2 py-0.5 rounded bg-[var(--color-paper-dark)] text-[var(--color-gray)]">
-              正在加载同日条目...
-            </span>
-          )}
-        </div>
-        <h1 className="text-3xl font-bold mb-3">{day.title}</h1>
-        <PreviewDescription text={day.excerpt} />
-        {extraError && (
-          <p className="text-xs text-[var(--color-danger)] mt-3">
-            同日聚合失败：{extraError}
-          </p>
-        )}
-      </header>
-
-      {day.error && (
-        <div className="mb-6 rounded-lg border border-[var(--color-danger)]/30 bg-[var(--color-danger)]/5 p-4 text-sm text-[var(--color-gray)]">
-          <p className="mb-1 font-medium text-[var(--color-danger)]">frontmatter 错误</p>
-          <p>{day.error}</p>
-        </div>
-      )}
-
-      <PreviewTagList tags={tags} className="mb-8" />
-
-      <div className="grid gap-6">
-        {day.entries.map((entry) => (
-          <article key={entry.id} className="card-hover rounded-lg p-6">
-            <header className="mb-4">
-              <div className="flex flex-wrap items-center gap-3 mb-2">
-                <span className="text-xs font-mono px-2 py-0.5 rounded bg-[var(--color-paper-dark)] text-[var(--color-gray)]">
-                  {entry.time}
-                </span>
-                <h2 className="text-xl font-semibold">{entry.title}</h2>
-              </div>
-
-              <div className="flex flex-wrap gap-2">
-                {entry.mood && <span className="tag">{entry.mood}</span>}
-                {entry.weather && <span className="tag">{entry.weather}</span>}
-                {entry.location && <span className="tag">{entry.location}</span>}
-                {entry.companions.map((person) => (
-                  <span key={`${entry.id}-${person}`} className="tag">{person}</span>
-                ))}
-              </div>
-            </header>
-
-            {entry.excerpt && (
-              <p className="text-sm text-[var(--color-gray)] mb-4">
-                {entry.excerpt}
-              </p>
-            )}
-
-            {entry.error && (
-              <div className="mb-4 rounded-lg border border-[var(--color-danger)]/30 bg-[var(--color-danger)]/5 p-4 text-sm text-[var(--color-gray)]">
-                <p className="mb-1 font-medium text-[var(--color-danger)]">frontmatter 错误</p>
-                <p>{entry.error}</p>
-              </div>
-            )}
-
-            <div className="prose-chinese">
-              <MarkdownRenderer content={entry.content} />
-            </div>
-          </article>
-        ))}
-      </div>
-    </div>
+    <DiaryDayView
+      day={day}
+      timelineBackLabel={`返回${DIARY_TIMELINE_LABEL}`}
+      showBackButton={!embedded}
+      aggregateError={extraError}
+      layout={layout}
+    />
   );
+}
+
+function resolvedDate(date: string): string {
+  return DIARY_DATE_PATTERN.test(date) ? date : "";
 }

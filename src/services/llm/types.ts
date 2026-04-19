@@ -68,6 +68,8 @@ export interface StreamChatParams {
   responseFormat?: string;
   /** 超时（秒） */
   timeout?: number;
+  /** 外部取消信号 */
+  signal?: AbortSignal;
 }
 
 /** stream_and_collect 的额外参数 */

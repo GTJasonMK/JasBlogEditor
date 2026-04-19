@@ -4,12 +4,14 @@ import { resolveRoadmapDisplay } from '@/services/displayMetadata';
 import { MarkdownRenderer } from '../MarkdownRenderer';
 import { PreviewBackButton } from '../PreviewBackButton';
 import { PreviewDescription } from '../PreviewMeta';
+import type { PreviewLayout } from '../previewLayout';
 
 interface RoadmapPreviewProps {
   fileName: string;
   metadata: RoadmapMetadata;
   content: string;
   embedded?: boolean;
+  layout?: PreviewLayout;
 }
 
 // 任务状态配置
@@ -116,7 +118,13 @@ function RoadmapItemGroup({
 }
 
 // 规划预览（与 JasBlog roadmap/[slug]/page.tsx 一致）
-export function RoadmapPreview({ fileName, metadata, content, embedded = false }: RoadmapPreviewProps) {
+export function RoadmapPreview({
+  fileName,
+  metadata,
+  content,
+  embedded = false,
+  layout = 'page',
+}: RoadmapPreviewProps) {
   // 从正文内容解析任务列表和剩余内容
   const { items, remainingContent } = parseRoadmapItemsFromContent(content);
 
@@ -131,40 +139,68 @@ export function RoadmapPreview({ fileName, metadata, content, embedded = false }
   const display = resolveRoadmapDisplay(fileName, metadata);
   const roadmapStatus = display.status;
   const roadmapStatusCfg = roadmapStatusConfig[roadmapStatus];
+  const shellClassName =
+    layout === 'pane' ? 'min-w-0 py-6' : 'max-w-4xl mx-auto px-6 py-12';
 
   return (
-    <div className="max-w-4xl mx-auto px-6 py-12">
+    <div className={shellClassName}>
       {!embedded && (
         <PreviewBackButton label="返回规划列表" />
       )}
 
-      {/* 标题区域 */}
-      <header className="mb-8">
-        <div className="flex items-center gap-3 mb-2">
-          <h1 className="text-2xl font-bold">{display.title}</h1>
-          <span className={`text-xs px-2 py-1 rounded ${roadmapStatusCfg.className}`}>
-            {roadmapStatusCfg.label}
-          </span>
-        </div>
-        <PreviewDescription text={metadata.description} className="text-[var(--color-gray)] mb-4" />
-
-        {/* 进度条 */}
-        {total > 0 && (
-          <div className="bg-[var(--color-paper-dark)] rounded-lg p-4">
-            <div className="flex justify-between text-sm mb-2">
-              <span className="text-[var(--color-gray)]">完成进度</span>
-              <span className="font-medium">
-                {doneCount}/{total} ({progressPercent}%)
+      {/* 仪表盘卡片 */}
+      <header className="rounded-2xl border border-[var(--color-paper-darker)] overflow-hidden mb-8">
+        <div className="h-1 bg-gradient-to-r from-[var(--color-vermilion)] to-[var(--color-gold)]" />
+        <div className="bg-[var(--color-paper-dark)]/40 p-8">
+          <p className="text-xs tracking-[0.16em] uppercase text-[var(--color-gold)] mb-2">我的规划</p>
+          <div className="flex items-center gap-3 mb-2">
+            {roadmapStatus === "active" ? (
+              <span className="relative flex h-3 w-3 shrink-0">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-[var(--color-vermilion)] opacity-75" />
+                <span className="relative inline-flex rounded-full h-3 w-3 bg-[var(--color-vermilion)]" />
               </span>
-            </div>
-            <div className="h-3 bg-gray-200 rounded-full overflow-hidden">
-              <div
-                className="h-full bg-green-500 transition-all duration-500"
-                style={{ width: `${progressPercent}%` }}
-              />
-            </div>
+            ) : (
+              <span className={`h-3 w-3 rounded-full shrink-0 ${roadmapStatus === "completed" ? "bg-green-500" : "bg-gray-400"}`} />
+            )}
+            <h1 className="text-2xl font-bold">{display.title}</h1>
+            <span className={`text-xs px-2 py-1 rounded ${roadmapStatusCfg.className}`}>
+              {roadmapStatusCfg.label}
+            </span>
           </div>
-        )}
+          <PreviewDescription text={metadata.description} className="text-[var(--color-gray)] mb-4" />
+
+          {/* 进度条 */}
+          {total > 0 && (
+            <div className="bg-[var(--color-bg,#fff)]/60 rounded-lg p-4">
+              <div className="flex justify-between text-sm mb-2">
+                <span className="text-[var(--color-gray)]">完成进度</span>
+                <span className="font-medium">
+                  {doneCount}/{total} ({progressPercent}%)
+                </span>
+              </div>
+              <div className="h-3 bg-gray-200 rounded-full overflow-hidden">
+                <div
+                  className="h-full bg-green-500 transition-all duration-500"
+                  style={{ width: `${progressPercent}%` }}
+                />
+              </div>
+              <div className="flex gap-4 mt-2 text-xs text-[var(--color-gray)]">
+                <span className="flex items-center gap-1.5">
+                  <span className="w-2.5 h-2.5 rounded-full bg-green-500" />
+                  已完成 {doneCount}
+                </span>
+                <span className="flex items-center gap-1.5">
+                  <span className="w-2.5 h-2.5 rounded-full bg-[var(--color-vermilion)]" />
+                  进行中 {inProgress.length}
+                </span>
+                <span className="flex items-center gap-1.5">
+                  <span className="w-2.5 h-2.5 rounded-full bg-gray-300" />
+                  待开始 {todo.length}
+                </span>
+              </div>
+            </div>
+          )}
+        </div>
       </header>
 
       {/* 正文内容（非任务部分） */}

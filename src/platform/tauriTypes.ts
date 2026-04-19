@@ -25,6 +25,7 @@ export interface RustLLMSettings {
   api_key?: string;
   base_url?: string;
   model?: string;
+  polish_concurrency?: number;
 }
 
 export interface RustSettings {

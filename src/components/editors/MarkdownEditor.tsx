@@ -1,126 +1,144 @@
-import { useState, useRef, useCallback, lazy, Suspense } from 'react';
-import { useEditorStore } from '@/store';
-import { ContentPreview } from '../preview/ContentPreview';
-import { PreviewScrollProvider } from '@/components/preview/PreviewScrollContext';
-import { AIAssistantPanel } from './AIAssistantPanel';
+import { lazy, Suspense, useDeferredValue, useRef, useState } from "react";
+import { useEditorStore } from "@/store";
+import { useInlineAIAssistant } from "@/hooks/useInlineAIAssistant";
+import type { EditorSurfaceHandle } from "@/services/editorSurface";
+import { resolveSuggestionEditorViewState } from "@/services/aiSuggestionWorkflow";
+import { ContentPreview } from "../preview/ContentPreview";
+import { PreviewScrollProvider } from "@/components/preview/PreviewScrollContext";
+import { AISuggestionFloatingActions } from "./AISuggestionFloatingActions";
+import { AIAssistantComposer } from "./AIAssistantComposer";
+import { MarkdownCodeEditor } from "./MarkdownCodeEditor";
 
-// JasBlogListPreview 体积较大（~1300行），仅在列表预览模式下需要，懒加载
 const LazyJasBlogListPreview = lazy(() =>
-  import('@/components/preview/JasBlogListPreview').then(m => ({ default: m.JasBlogListPreview }))
+  import("@/components/preview/JasBlogListPreview").then((module) => ({
+    default: module.JasBlogListPreview,
+  }))
 );
 
 export function MarkdownEditor() {
-  const { currentFile, updateContent, viewMode, previewMode, aiPanelVisible, setAIPanelVisible } = useEditorStore();
-
+  const {
+    currentFile,
+    updateContent,
+    viewMode,
+    previewMode,
+    aiPanelVisible,
+    setAIPanelVisible,
+  } = useEditorStore();
   const [previewContainer, setPreviewContainer] = useState<HTMLDivElement | null>(null);
-  const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const editorRef = useRef<EditorSurfaceHandle | null>(null);
 
-  const getSelectedText = useCallback(() => {
-    const ta = textareaRef.current;
-    if (!ta) return '';
-    return ta.value.substring(ta.selectionStart, ta.selectionEnd);
-  }, []);
+  const aiAssistant = useInlineAIAssistant({
+    currentFile,
+    updateContent,
+    composerVisible: aiPanelVisible,
+    closeComposer: () => setAIPanelVisible(false),
+    isPreviewMode: viewMode === "preview",
+    editorRef,
+  });
+  const deferredSuggestion = useDeferredValue(aiAssistant.pendingSuggestion);
+  const suggestionViewState = resolveSuggestionEditorViewState({
+    isGenerating: aiAssistant.isGenerating,
+    pendingSuggestion: aiAssistant.pendingSuggestion,
+    deferredSuggestion,
+  });
 
-  const handleInsert = useCallback((text: string) => {
-    const ta = textareaRef.current;
-    if (!ta || !currentFile) return;
-    const pos = ta.selectionEnd;
-    const newContent = currentFile.content.slice(0, pos) + text + currentFile.content.slice(pos);
-    updateContent(newContent);
-    // 更新光标位置到插入内容之后
-    requestAnimationFrame(() => {
-      ta.selectionStart = pos + text.length;
-      ta.selectionEnd = pos + text.length;
-      ta.focus();
-    });
-  }, [currentFile, updateContent]);
+  if (!currentFile) {
+    return null;
+  }
 
-  const handleReplace = useCallback((text: string) => {
-    const ta = textareaRef.current;
-    if (!ta || !currentFile) return;
-    const start = ta.selectionStart;
-    const end = ta.selectionEnd;
-    const newContent = currentFile.content.slice(0, start) + text + currentFile.content.slice(end);
-    updateContent(newContent);
-    requestAnimationFrame(() => {
-      ta.selectionStart = start;
-      ta.selectionEnd = start + text.length;
-      ta.focus();
-    });
-  }, [currentFile, updateContent]);
+  const editorContent = currentFile.content;
+  const bodyContent = aiAssistant.pendingSuggestion
+    ? aiAssistant.pendingSuggestion.nextContent
+    : currentFile.content;
+  const showListPreview = previewMode === "list" && currentFile.type !== "doc";
+  const showAIComposer = aiPanelVisible && viewMode !== "preview";
 
-  if (!currentFile) return null;
+  const renderEditor = () =>
+    <div className="relative flex h-full min-h-0 flex-col">
+      {aiAssistant.pendingSuggestion && (
+        <AISuggestionFloatingActions
+          isGenerating={aiAssistant.isGenerating}
+          canAccept={!aiAssistant.applyIssue}
+          onAccept={aiAssistant.handleAcceptSuggestion}
+          onReject={aiAssistant.handleRejectSuggestion}
+          onCancel={aiAssistant.handleCancel}
+        />
+      )}
 
-  // 预览内容：store 中已将 frontmatter 与正文分离，此处直接使用正文
-  const bodyContent = currentFile.content;
+      <MarkdownCodeEditor
+        ref={editorRef}
+        value={editorContent}
+        readOnly={suggestionViewState.readOnly}
+        isGenerating={aiAssistant.isGenerating}
+        suggestion={suggestionViewState.suggestion}
+        onChange={updateContent}
+      />
+    </div>;
 
-  const renderEditor = () => (
-    <textarea
-      ref={textareaRef}
-      value={currentFile.content}
-      onChange={(e) => updateContent(e.target.value)}
-      className="w-full h-full p-4 resize-none bg-[var(--color-paper)] editor-textarea focus:outline-none"
-      placeholder="开始编写..."
+  const renderPreview = () => (
+    <div ref={setPreviewContainer} className="w-full h-full overflow-auto bg-[var(--color-paper)]">
+      <PreviewScrollProvider container={previewContainer}>
+        {showListPreview ? (
+          <Suspense
+            fallback={
+              <div className="flex items-center justify-center py-20 text-[var(--color-text-muted)]">
+                加载预览中...
+              </div>
+            }
+          >
+            <LazyJasBlogListPreview
+              activeFile={currentFile}
+              activeBodyContent={bodyContent}
+            />
+          </Suspense>
+        ) : (
+          <ContentPreview file={currentFile} bodyContent={bodyContent} />
+        )}
+      </PreviewScrollProvider>
+    </div>
+  );
+
+  const composer = (
+    <AIAssistantComposer
+      visible={showAIComposer}
+      prompt={aiAssistant.prompt}
+      isGenerating={aiAssistant.isGenerating}
+      hasPendingSuggestion={Boolean(aiAssistant.pendingSuggestion)}
+      error={aiAssistant.error}
+      applyIssue={aiAssistant.applyIssue}
+      reasoning={aiAssistant.reasoning}
+      showReasoning={aiAssistant.showReasoning}
+      onClose={aiAssistant.handleCloseComposer}
+      onPromptChange={aiAssistant.setPrompt}
+      onPresetSelect={aiAssistant.handlePresetSelect}
+      onSubmit={() => void aiAssistant.handleSubmit()}
+      onCancel={aiAssistant.handleCancel}
+      onToggleReasoning={aiAssistant.toggleReasoning}
     />
   );
 
-  const renderPreview = () => {
-    const showListPreview = previewMode === 'list' && currentFile.type !== 'doc';
-
-    return (
-      <div ref={setPreviewContainer} className="w-full h-full overflow-auto bg-[var(--color-paper)]">
-        <PreviewScrollProvider container={previewContainer}>
-          {showListPreview
-            ? <Suspense fallback={<div className="flex items-center justify-center py-20 text-[var(--color-text-muted)]">加载预览中...</div>}>
-                <LazyJasBlogListPreview activeFile={currentFile} activeBodyContent={bodyContent} />
-              </Suspense>
-            : <ContentPreview file={currentFile} bodyContent={bodyContent} />
-          }
-        </PreviewScrollProvider>
-      </div>
-    );
-  };
-
-  // AI 面板仅在编辑模式和分割模式下显示（预览模式没有 textarea）
-  const showAIPanel = aiPanelVisible && viewMode !== 'preview';
-
-  const aiPanel = showAIPanel && (
-    <AIAssistantPanel
-      visible
-      onClose={() => setAIPanelVisible(false)}
-      content={currentFile.content}
-      selectedText={getSelectedText()}
-      fileType={currentFile.type}
-      onInsert={handleInsert}
-      onReplace={handleReplace}
-    />
-  );
-
-  if (viewMode === 'edit') {
+  if (viewMode === "edit") {
     return (
       <div className="flex-1 min-h-0 flex flex-col overflow-hidden">
         <div className="flex-1 min-h-0 overflow-hidden">{renderEditor()}</div>
-        {aiPanel}
+        {composer}
       </div>
     );
   }
 
-  if (viewMode === 'preview') {
+  if (viewMode === "preview") {
     return <div className="flex-1 min-h-0 overflow-hidden">{renderPreview()}</div>;
   }
 
-  // split mode
   return (
     <div className="flex-1 min-h-0 flex flex-col overflow-hidden">
       <div className="flex-1 min-h-0 flex overflow-hidden">
         <div className="w-1/2 min-h-0 border-r border-[var(--color-border)] overflow-hidden">
           {renderEditor()}
         </div>
-        <div className="w-1/2 min-h-0 overflow-hidden">
-          {renderPreview()}
-        </div>
+        <div className="w-1/2 min-h-0 overflow-hidden">{renderPreview()}</div>
       </div>
-      {aiPanel}
+      {composer}
     </div>
   );
 }

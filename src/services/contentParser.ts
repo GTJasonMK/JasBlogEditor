@@ -42,6 +42,7 @@ export function parseMarkdownContent(
   const hasBom = raw.charCodeAt(0) === 0xFEFF;
   const rawText = hasBom ? raw.slice(1) : raw;
   const lineEnding: LineEnding = rawText.includes('\r\n') ? 'crlf' : 'lf';
+  const normalizedRawText = normalizeEditorContent(rawText);
 
   // 匹配 YAML frontmatter: --- ... ---
   // - frontmatterBlock：尽量保留原始文本（含注释/缩进/空行），用于“原样保存”
@@ -51,12 +52,21 @@ export function parseMarkdownContent(
   if (!frontmatterMatch) {
     // 没有 frontmatter，返回默认元数据
     const defaultMetadata = getDefaultMetadata(type);
-    return { metadata: defaultMetadata, issues: [], frontmatterRaw: {}, frontmatterBlock: null, content: rawText, hasFrontmatter: false, hasBom, lineEnding };
+    return {
+      metadata: defaultMetadata,
+      issues: [],
+      frontmatterRaw: {},
+      frontmatterBlock: null,
+      content: normalizedRawText,
+      hasFrontmatter: false,
+      hasBom,
+      lineEnding,
+    };
   }
 
   const frontmatterBlock = frontmatterMatch[1] + frontmatterMatch[2] + frontmatterMatch[3];
   const yamlContent = frontmatterMatch[2];
-  const bodyContent = frontmatterMatch[4];
+  const bodyContent = normalizeEditorContent(frontmatterMatch[4]);
 
   let parsed: Record<string, unknown> = {};
   try {
@@ -78,6 +88,10 @@ export function parseMarkdownContent(
   // 根据类型构建元数据
   const { metadata, issues } = buildMetadata(parsed, type);
   return { metadata, issues, frontmatterRaw: parsed, frontmatterBlock, content: bodyContent, hasFrontmatter: true, hasBom, lineEnding };
+}
+
+function normalizeEditorContent(content: string): string {
+  return content.replace(/\r\n/g, '\n');
 }
 
 /**

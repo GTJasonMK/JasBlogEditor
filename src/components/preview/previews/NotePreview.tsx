@@ -11,12 +11,14 @@ import { BackToTop } from '../BackToTop';
 import { Comments } from '../Comments';
 import { PreviewBackButton } from '../PreviewBackButton';
 import { PreviewDate, PreviewTagList } from '../PreviewMeta';
+import type { PreviewLayout } from '../previewLayout';
 
 interface NotePreviewProps {
   fileName: string;
   metadata: NoteMetadata;
   content: string;
   embedded?: boolean;
+  layout?: PreviewLayout;
 }
 
 type ContentSegment =
@@ -107,14 +109,28 @@ function hasVisibleTocHeadings(content: string): boolean {
 }
 
 // 学习笔记预览（与 JasBlog notes/[slug]/page.tsx 一致）
-export function NotePreview({ fileName, metadata, content, embedded = false }: NotePreviewProps) {
+export function NotePreview({
+  fileName,
+  metadata,
+  content,
+  embedded = false,
+  layout = 'page',
+}: NotePreviewProps) {
   const setPreviewMode = useEditorStore((state) => state.setPreviewMode);
   const setNotesListTag = useEditorStore((state) => state.setNotesListTag);
   const segments = parseContent(content);
   const display = resolveNoteDisplay(fileName, metadata);
 
   const hasTocCandidates = hasVisibleTocHeadings(content);
-  const showToc = hasTocCandidates;
+  const showToc = hasTocCandidates && layout === 'page';
+  const shellClassName =
+    layout === 'pane' ? 'min-w-0 py-6' : 'max-w-6xl mx-auto px-6 py-12';
+  const contentLayoutClassName =
+    layout === 'pane'
+      ? 'flex min-w-0 flex-col gap-8'
+      : 'flex gap-10 items-start';
+  const articleClassName =
+    layout === 'pane' ? 'min-w-0 flex-1' : 'min-w-0 flex-1 max-w-3xl';
 
   const slug = fileName.replace(/\.md$/i, '');
   const commentTerm = `/notes/${slug}`;
@@ -124,22 +140,27 @@ export function NotePreview({ fileName, metadata, content, embedded = false }: N
   };
 
   return (
-    <div className="max-w-6xl mx-auto px-6 py-12">
+    <div className={shellClassName}>
       {!embedded && (
         <PreviewBackButton label="返回笔记列表" className="mb-8" />
       )}
 
-      <div className="flex gap-10 items-start">
-        <div className="min-w-0 flex-1 max-w-3xl">
-          {/* 文章头部 */}
-          <header className="mb-8">
-            <PreviewDate date={display.date} />
-            <h1 className="text-3xl font-bold mt-2 mb-4">{display.title}</h1>
-            <PreviewTagList
-              tags={metadata.tags}
-              onTagClick={embedded ? undefined : handleTagClick}
-              buttonClassName="tag hover:bg-[var(--color-vermilion)] hover:text-white"
-            />
+      <div className={contentLayoutClassName}>
+        <div className={articleClassName}>
+          {/* 纸页卡片 */}
+          <header className="relative bg-[var(--color-paper)] border border-[var(--color-paper-darker)] rounded-2xl p-8 mb-8 overflow-hidden">
+            {/* 右上角朱红圆印装饰 */}
+            <div className="absolute -top-3 -right-3 w-24 h-24 rounded-full border-2 border-dashed border-[var(--color-vermilion)]/15" />
+            <div className="border-l-4 border-[var(--color-vermilion)] pl-6">
+              <p className="text-xs tracking-[0.16em] uppercase text-[var(--color-gold)] mb-2">学习笔记</p>
+              <PreviewDate date={display.date} />
+              <h1 className="text-3xl font-bold mt-2 mb-4">{display.title}</h1>
+              <PreviewTagList
+                tags={metadata.tags}
+                onTagClick={embedded ? undefined : handleTagClick}
+                buttonClassName="tag hover:bg-[var(--color-vermilion)] hover:text-white"
+              />
+            </div>
           </header>
 
           <div className="divider-cloud mb-8" />
@@ -165,7 +186,7 @@ export function NotePreview({ fileName, metadata, content, embedded = false }: N
 
           {!embedded && (
             <section>
-              <h2 className="text-xl font-semibold mb-6">Comments and discussion</h2>
+              <h2 className="text-xl font-semibold mb-6">评论与讨论</h2>
               <Comments term={commentTerm} />
             </section>
           )}

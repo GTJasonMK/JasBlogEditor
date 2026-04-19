@@ -1,854 +1,134 @@
-import { useEffect, useMemo, useRef, useState, type ReactElement } from 'react';
-import { RoadmapPreview } from '@/components/preview/previews/RoadmapPreview';
-import { GraphPreview } from '@/components/preview/previews/GraphPreview';
-import type {
-  GraphMetadata,
-  RoadmapMetadata,
-} from '@/types';
-import { FrontmatterHelpTab } from './help/FrontmatterHelpTab';
-import { FRONTMATTER_SECTION_LINKS } from './help/frontmatterHelpData';
+import { useEffect, useMemo, useRef, useState } from "react";
+import { HelpModalActivePanel } from "./help/helpModalActivePanel";
 import {
-  CodeCard,
-  MarkdownPreview,
-  PreviewCard,
-  Section,
-  SideBySideExample,
-} from './help/helpBlocks';
+  filterHelpTabs,
+  groupHelpTabs,
+  type HelpTabDefinition,
+  type HelpTabId,
+} from "./help/helpModalSchema";
+import { HelpModalSidebar } from "./help/helpModalSidebar";
+import { HELP_MODAL_TABS } from "./help/helpModalTabs";
+
+const DEFAULT_TAB_ID: HelpTabId = "markdown";
+const SECTION_SCROLL_GAP = 16;
 
 interface HelpModalProps {
   open: boolean;
   onClose: () => void;
 }
 
-type HelpTabId =
-  | 'markdown'
-  | 'gfm'
-  | 'code'
-  | 'math'
-  | 'mermaid'
-  | 'alert'
-  | 'roadmap'
-  | 'graph'
-  | 'frontmatter';
-
-interface HelpTab {
-  id: HelpTabId;
-  label: string;
-  keywords: string[];
-  render: () => ReactElement;
+function HelpModalHeader({ onClose }: { onClose: () => void }) {
+  return (
+    <div className="flex h-12 shrink-0 items-center gap-3 border-b border-[var(--color-border)] px-4">
+      <div className="min-w-0 flex items-center gap-2 text-sm font-medium text-[var(--color-text)]">
+        <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 10h.01M12 14h.01M16 10h.01M9 16h6M12 3a9 9 0 100 18 9 9 0 000-18z" />
+        </svg>
+        渲染帮助
+      </div>
+      <div className="flex-1" />
+      <button
+        onClick={onClose}
+        className="shrink-0 rounded-md px-2 py-1 text-sm text-[var(--color-text-muted)] transition-colors hover:bg-[var(--color-surface)] hover:text-[var(--color-text)]"
+        title="关闭 (Esc)"
+        aria-label="关闭帮助面板"
+      >
+        关闭
+      </button>
+    </div>
+  );
 }
 
-function DataUriImage(): string {
-  // 纯内联 SVG，避免依赖网络
-  return 'data:image/svg+xml;charset=utf-8,%3Csvg%20xmlns%3D%27http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%27%20width%3D%27480%27%20height%3D%27240%27%3E%3Crect%20width%3D%27100%25%27%20height%3D%27100%25%27%20fill%3D%27%23fdf5e8%27%2F%3E%3Ctext%20x%3D%2750%25%27%20y%3D%2750%25%27%20font-size%3D%2724%27%20text-anchor%3D%27middle%27%20fill%3D%27%23333%27%20dy%3D%27.3em%27%3EJasBlogEditor%3C%2Ftext%3E%3C%2Fsvg%3E';
+function getActiveTab(
+  tabs: readonly HelpTabDefinition[],
+  activeId: HelpTabId | null
+): HelpTabDefinition | null {
+  return tabs.find((tab) => tab.id === activeId) ?? tabs[0] ?? null;
 }
-
-const tabSectionMap: Record<HelpTabId, { id: string; title: string }[]> = {
-  markdown: [
-    { id: 'markdown-support', title: '支持范围' },
-    { id: 'markdown-comprehensive-example', title: '综合示例' },
-    { id: 'markdown-quick-reference', title: '语法速查表' },
-    { id: 'markdown-faq', title: '常见问题' },
-  ],
-  gfm: [
-    { id: 'gfm-support', title: '支持范围' },
-    { id: 'gfm-example', title: 'GFM 示例' },
-    { id: 'gfm-tips', title: '使用建议' },
-  ],
-  code: [
-    { id: 'code-support', title: '支持范围' },
-    { id: 'code-basic-example', title: '代码块示例' },
-    { id: 'code-advanced-example', title: '高级代码块示例' },
-    { id: 'code-notes', title: '注意事项' },
-  ],
-  math: [
-    { id: 'math-support', title: '支持范围' },
-    { id: 'math-basic-example', title: '公式示例' },
-    { id: 'math-advanced-example', title: '进阶公式示例' },
-    { id: 'math-faq', title: '常见问题' },
-  ],
-  mermaid: [
-    { id: 'mermaid-support', title: '支持范围' },
-    { id: 'mermaid-basic-example', title: 'Mermaid 示例' },
-    { id: 'mermaid-sequence-example', title: '时序图示例' },
-    { id: 'mermaid-faq', title: '常见问题' },
-  ],
-  alert: [
-    { id: 'alert-support', title: '支持范围' },
-    { id: 'alert-basic-example', title: 'Alert 示例' },
-    { id: 'alert-advanced-example', title: '多行与列表 Alert' },
-    { id: 'alert-rules', title: '书写规范' },
-  ],
-  roadmap: [
-    { id: 'roadmap-support', title: '渲染规则' },
-    { id: 'roadmap-example', title: '任务语法示例' },
-    { id: 'roadmap-fallback', title: '解析细节与回退行为' },
-  ],
-  graph: [
-    { id: 'graph-support', title: '渲染规则' },
-    { id: 'graph-example', title: 'graph 代码块示例' },
-    { id: 'graph-schema', title: 'JSON 字段速查' },
-    { id: 'graph-faq', title: '常见问题' },
-  ],
-  frontmatter: [
-    { id: 'frontmatter-support', title: '说明' },
-    ...FRONTMATTER_SECTION_LINKS.slice(1),
-  ],
-};
 
 export function HelpModal({ open, onClose }: HelpModalProps) {
-  const [tab, setTab] = useState<HelpTabId>('markdown');
-  const [searchKeyword, setSearchKeyword] = useState('');
+  const [activeId, setActiveId] = useState<HelpTabId>(DEFAULT_TAB_ID);
+  const [searchKeyword, setSearchKeyword] = useState("");
   const contentRef = useRef<HTMLDivElement>(null);
+  const summaryRef = useRef<HTMLDivElement>(null);
 
-  // ESC 关闭
+  const filteredTabs = useMemo(
+    () => filterHelpTabs(HELP_MODAL_TABS, searchKeyword),
+    [searchKeyword]
+  );
+  const groupedTabs = useMemo(
+    () => groupHelpTabs(filteredTabs),
+    [filteredTabs]
+  );
+  const activeTab = getActiveTab(filteredTabs, activeId);
+
   useEffect(() => {
     if (!open) return;
-    const onKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') onClose();
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") onClose();
     };
-    window.addEventListener('keydown', onKeyDown);
-    return () => window.removeEventListener('keydown', onKeyDown);
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
   }, [open, onClose]);
 
-  // 打开时默认回到第一个 tab，避免上次停留在“重资源”的图谱/roadmap 造成卡顿
   useEffect(() => {
-    if (open) {
-      setTab('markdown');
-      setSearchKeyword('');
-    }
+    if (!open) return;
+    setActiveId(DEFAULT_TAB_ID);
+    setSearchKeyword("");
   }, [open]);
 
-  const tabs: HelpTab[] = useMemo(() => {
-    const image = DataUriImage();
-
-    const basicMarkdown = [
-      '# 标题（H1-H4 会自动生成锚点）',
-      '',
-      '这是 **加粗**、*斜体* 与 `行内代码`。',
-      '',
-      '- 无序列表',
-      '  - 二级列表',
-      '1. 有序列表',
-      '2. 第二项',
-      '',
-      '> 普通引用块（没有 [!NOTE] 的情况下）',
-      '',
-      '[外部链接](https://example.com) 与 [相对链接](/docs/intro)',
-      '',
-      `![示例图片（点击可放大）](${image})`,
-      '',
-      '---',
-      '',
-      '提示：标题右侧会出现 `#` 锚点，点击可平滑滚动并更新 URL hash。',
-    ].join('\n');
-
-    const gfmExample = [
-      '| 功能 | 语法 | 说明 |',
-      '| --- | --- | --- |',
-      '| 表格 | `| a | b |` | 支持横向滚动 |',
-      '| 任务列表 | `- [ ]` | 支持 |',
-      '| 删除线 | `~~text~~` | 支持 |',
-      '',
-      '- [ ] Todo',
-      '- [x] Done',
-      '',
-      '自动链接：https://example.com',
-      '',
-      '脚注示例[^1]',
-      '',
-      '[^1]: 这是脚注内容。',
-    ].join('\n');
-
-    const codeBlocksExample = [
-      '```ts',
-      'type User = { id: string; name: string };',
-      '',
-      'export function hello(user: User) {',
-      '  console.log(`Hello, ${user.name}`);',
-      '}',
-      '```',
-      '',
-      '```bash',
-      'npm run dev:app',
-      '```',
-    ].join('\n');
-
-    const mathExample = [
-      '行内公式：$E = mc^2$',
-      '',
-      '块级公式：',
-      '',
-      '$$',
-      '\\int_0^1 x^2 \\, dx = \\frac{1}{3}',
-      '$$',
-    ].join('\n');
-
-    const mermaidExample = [
-      '```mermaid',
-      'flowchart TD',
-      '  A[开始] --> B{条件?}',
-      '  B -- 是 --> C[执行]',
-      '  B -- 否 --> D[跳过]',
-      '  C --> E[结束]',
-      '  D --> E',
-      '```',
-    ].join('\n');
-
-    const alertExample = [
-      '> [!NOTE]',
-      '> 这是 Note 提示',
-      '',
-      '> [!TIP]',
-      '> 这是 Tip 提示',
-      '',
-      '> [!IMPORTANT]',
-      '> 重要信息',
-      '',
-      '> [!WARNING]',
-      '> 警告信息',
-      '',
-      '> [!CAUTION]',
-      '> 注意事项',
-    ].join('\n');
-
-    const markdownQuickRef = [
-      '| 语法 | 示例 | 备注 |',
-      '| --- | --- | --- |',
-      '| 标题 | `# 标题` | H1~H4 会生成锚点 |',
-      '| 强调 | `**加粗**` / `*斜体*` | 支持组合嵌套 |',
-      '| 行内代码 | `` `code` `` | 不会触发高亮插件 |',
-      '| 链接 | `[文本](https://example.com)` | 外链自动新窗口打开 |',
-      '| 图片 | `![说明](url)` | alt 文本会作为图注显示 |',
-      '| 引用 | `> 引用` | 可配合 Alert 扩展语法 |',
-      '| 分隔线 | `---` | 常用于章节分隔 |',
-      '',
-      '提示：原生 HTML 标签默认不会当作 HTML 渲染。',
-    ].join('\n');
-
-    const codeAdvancedExample = [
-      '```json',
-      '{',
-      '  "name": "JasBlogEditor",',
-      '  "scripts": {',
-      '    "dev": "npm run dev:app"',
-      '  }',
-      '}',
-      '```',
-      '',
-      '```',
-      '无语言标签代码块（仍会按代码块样式显示）',
-      '```',
-    ].join('\n');
-
-    const mathAdvancedExample = [
-      '二次方程求根公式：',
-      '',
-      '$$',
-      'x = \\frac{-b \\pm \\sqrt{b^2 - 4ac}}{2a}',
-      '$$',
-      '',
-      '矩阵示例：',
-      '',
-      '$$',
-      '\\begin{bmatrix}',
-      'a & b \\\\',
-      'c & d',
-      '\\end{bmatrix}',
-      '$$',
-    ].join('\n');
-
-    const mermaidSequenceExample = [
-      '```mermaid',
-      'sequenceDiagram',
-      '  participant U as 用户',
-      '  participant E as Editor',
-      '  participant R as Renderer',
-      '  U->>E: 编辑 Markdown',
-      '  E->>R: 实时更新内容',
-      '  R-->>U: 返回渲染结果',
-      '```',
-    ].join('\n');
-
-    const alertAdvancedExample = [
-      '> [!WARNING]',
-      '> 请先保存再批量重命名。',
-      '>',
-      '> - 建议先执行一次 `Ctrl+S`',
-      '> - 再执行批量操作',
-      '',
-      '> [!IMPORTANT]',
-      '> Alert 标记必须出现在引用块第一行。',
-    ].join('\n');
-
-    const graphSchemaExample = [
-      '{',
-      '  "nodes": [',
-      '    {',
-      '      "id": "node-1",',
-      '      "position": { "x": 120, "y": 80 },',
-      '      "data": {',
-      '        "label": "核心概念",',
-      '        "color": "blue",',
-      '        "edgeColor": "p1",',
-      '        "tags": ["基础"]',
-      '      }',
-      '    }',
-      '  ],',
-      '  "edges": [',
-      '    {',
-      '      "id": "edge-1",',
-      '      "source": "node-1",',
-      '      "target": "node-2",',
-      '      "label": "依赖"',
-      '    }',
-      '  ]',
-      '}',
-    ].join('\n');
-
-    const roadmapBodyExample = [
-      '这里是规划说明（非任务内容，会按 Markdown 渲染）。',
-      '',
-      '## 任务列表',
-      '',
-      '- [-] 搭建编辑器骨架 `high`',
-      '  描述: 支持打开/保存',
-      '  详情:',
-      '    - 需要同时覆盖桌面与迷你模式',
-      '    - 包含端口冲突自动处理',
-      '  截止: 2026-06-01',
-      '',
-      '- [ ] 增加帮助文档面板 `medium`',
-      '  描述: 需要分 Tab 展示',
-      '  详情:',
-      '    - 增加搜索框',
-      '    - 增加章节目录锚点',
-      '    - 按渲染能力分组说明',
-      '',
-      '- [x] 修复端口冲突 `low`',
-      '  描述: 兼容 start.bat 启动流程',
-      '  完成: 2026-02-05',
-    ].join('\n');
-    const graphBodyExample = [
-      '```graph',
-      '{',
-      '  "nodes": [',
-      '    {',
-      '      "id": "n1",',
-      '      "position": { "x": 0, "y": 0 },',
-      '      "data": { "label": "A", "color": "blue", "edgeColor": "p2", "tags": ["demo"] }',
-      '    },',
-      '    {',
-      '      "id": "n2",',
-      '      "position": { "x": 260, "y": 140 },',
-      '      "data": { "label": "B", "color": "green" }',
-      '    }',
-      '  ],',
-      '  "edges": [',
-      '    { "id": "e1", "source": "n1", "target": "n2", "label": "相关" }',
-      '  ]',
-      '}',
-      '```',
-      '',
-      '这里是图谱说明：',
-      '',
-      '- 节点颜色：`default/red/orange/yellow/green/blue/purple/pink`',
-      '- 连线颜色：由“源节点”的 `data.edgeColor` 控制（`default` 或 `p0~p9`）',
-    ].join('\n');
-
-    return [
-      {
-        id: 'markdown',
-        label: '基础 Markdown',
-        keywords: ['markdown', 'md', '标题', '列表', '链接', '图片'],
-        render: () => (
-          <div>
-            <Section id="markdown-support" title="支持范围">
-              <ul className="text-sm text-[var(--color-text)] list-disc pl-5 space-y-1">
-                <li>标题（H1-H4 自动生成锚点，支持平滑滚动）</li>
-                <li>加粗 / 斜体 / 行内代码</li>
-                <li>有序 / 无序列表</li>
-                <li>引用块、分隔线</li>
-                <li>链接（外链自动使用新窗口打开）</li>
-                <li>图片（点击放大，alt 作为图注）</li>
-              </ul>
-            </Section>
-
-            <SideBySideExample
-              id="markdown-comprehensive-example"
-              title="综合示例"
-              description="该预览使用应用内同一套渲染器，效果与右侧预览区域一致。"
-              code={basicMarkdown}
-              preview={<MarkdownPreview content={basicMarkdown} />}
-            />
-
-            <SideBySideExample
-              id="markdown-quick-reference"
-              title="语法速查表"
-              description="按当前渲染器的真实行为整理，适合作为日常写作对照。"
-              code={markdownQuickRef}
-              preview={<MarkdownPreview content={markdownQuickRef} />}
-            />
-
-            <Section id="markdown-faq" title="常见问题">
-              <ul className="text-sm text-[var(--color-text)] list-disc pl-5 space-y-1">
-                <li><code className="font-mono">#~####</code> 会生成锚点，<code className="font-mono">#####/######</code> 不生成锚点。</li>
-                <li>链接若包含 <code className="font-mono">http://</code> 或 <code className="font-mono">https://</code>，会自动在新窗口打开。</li>
-                <li>图片预览支持点击放大，建议始终补全 alt 文本，便于无障碍阅读。</li>
-                <li>原生 HTML 标签会按文本处理，如需复杂布局建议改用 Markdown 原生语法。</li>
-              </ul>
-            </Section>
-          </div>
-        ),
-      },
-      {
-        id: 'gfm',
-        label: 'GFM 扩展',
-        keywords: ['gfm', '表格', '脚注', '任务列表', '删除线'],
-        render: () => (
-          <div>
-            <Section id="gfm-support" title="支持范围（remark-gfm）">
-              <ul className="text-sm text-[var(--color-text)] list-disc pl-5 space-y-1">
-                <li>表格（自动包裹横向滚动容器）</li>
-                <li>任务列表（- [ ] / - [x]）</li>
-                <li>删除线（~~text~~）</li>
-                <li>自动链接（直接写 URL）</li>
-                <li>脚注（[^1]）</li>
-              </ul>
-            </Section>
-
-            <SideBySideExample
-              title="GFM 示例"
-              id="gfm-example"
-              code={gfmExample}
-              preview={<MarkdownPreview content={gfmExample} />}
-            />
-
-            <Section id="gfm-tips" title="使用建议">
-              <ul className="text-sm text-[var(--color-text)] list-disc pl-5 space-y-1">
-                <li>表格列较多时会自动横向滚动，建议列头简短，避免移动端换行过多。</li>
-                <li>任务列表只负责渲染勾选状态，不会自动写回 roadmap 任务数据结构。</li>
-                <li>脚注编号按正文出现顺序生成，建议同一文档避免重复定义同名脚注。</li>
-              </ul>
-            </Section>
-          </div>
-        ),
-      },
-      {
-        id: 'code',
-        label: '代码块',
-        keywords: ['代码块', 'syntax highlight', 'rehype-highlight', '复制'],
-        render: () => (
-          <div>
-            <Section id="code-support" title="支持范围">
-              <ul className="text-sm text-[var(--color-text)] list-disc pl-5 space-y-1">
-                <li>围栏代码块（```lang）</li>
-                <li>语法高亮（rehype-highlight）</li>
-                <li>语言标签 + 复制按钮（鼠标悬停显示）</li>
-              </ul>
-            </Section>
-
-            <SideBySideExample
-              title="代码块示例"
-              code={codeBlocksExample}
-              id="code-basic-example"
-              preview={<MarkdownPreview content={codeBlocksExample} />}
-            />
-
-            <SideBySideExample
-              title="高级代码块示例"
-              description="包含 JSON 与无语言标签代码块，便于验证高亮与复制按钮表现。"
-              id="code-advanced-example"
-              code={codeAdvancedExample}
-              preview={<MarkdownPreview content={codeAdvancedExample} />}
-            />
-
-            <Section id="code-notes" title="注意事项">
-              <ul className="text-sm text-[var(--color-text)] list-disc pl-5 space-y-1">
-                <li>代码块复制按钮在鼠标悬停时出现，点击会复制当前块完整内容。</li>
-                <li>未声明语言标签时，仍会按代码块样式渲染，但不会触发特定语言高亮。</li>
-                <li>行内代码与代码块分属不同渲染路径，行内代码不会展示复制按钮。</li>
-              </ul>
-            </Section>
-          </div>
-        ),
-      },
-      {
-        id: 'math',
-        label: '数学公式',
-        keywords: ['katex', '公式', 'latex', '数学'],
-        render: () => (
-          <div>
-            <Section id="math-support" title="支持范围（KaTeX）">
-              <ul className="text-sm text-[var(--color-text)] list-disc pl-5 space-y-1">
-                <li>行内公式：<code className="font-mono">$...$</code></li>
-                <li>块级公式：<code className="font-mono">$$...$$</code></li>
-              </ul>
-            </Section>
-
-            <SideBySideExample
-              title="公式示例"
-              code={mathExample}
-              preview={<MarkdownPreview content={mathExample} />}
-              id="math-basic-example"
-            />
-
-            <SideBySideExample
-              title="进阶公式示例"
-              description="涵盖常见的求根公式与矩阵排版，便于验证 KaTeX 复杂表达式。"
-              code={mathAdvancedExample}
-              id="math-advanced-example"
-              preview={<MarkdownPreview content={mathAdvancedExample} />}
-            />
-
-            <Section id="math-faq" title="常见问题">
-              <ul className="text-sm text-[var(--color-text)] list-disc pl-5 space-y-1">
-                <li>块级公式必须使用独立行的 <code className="font-mono">$$</code> 包裹，避免与正文混排。</li>
-                <li>KaTeX 语法错误会导致公式原样显示，建议先在简单公式中验证后再扩展。</li>
-                <li>公式中的反斜杠需保持完整，例如 <code className="font-mono">\frac</code>、<code className="font-mono">\sqrt</code>。</li>
-              </ul>
-            </Section>
-          </div>
-        ),
-      },
-      {
-        id: 'mermaid',
-        label: 'Mermaid 图表',
-        keywords: ['mermaid', '流程图', '时序图', 'diagram'],
-        render: () => (
-          <div>
-            <Section id="mermaid-support" title="支持范围">
-              <ul className="text-sm text-[var(--color-text)] list-disc pl-5 space-y-1">
-                <li>围栏代码块：<code className="font-mono">```mermaid</code></li>
-                <li>自动渲染为 SVG（主题会跟随浅色/深色切换）</li>
-              </ul>
-            </Section>
-
-            <SideBySideExample
-              id="mermaid-basic-example"
-              title="Mermaid 示例"
-              code={mermaidExample}
-              preview={<MarkdownPreview content={mermaidExample} />}
-            />
-
-            <SideBySideExample
-              title="时序图示例"
-              description="除流程图外，也支持 sequenceDiagram、classDiagram 等 Mermaid 语法。"
-              code={mermaidSequenceExample}
-              preview={<MarkdownPreview content={mermaidSequenceExample} />}
-              id="mermaid-sequence-example"
-            />
-
-            <Section id="mermaid-faq" title="常见问题">
-              <ul className="text-sm text-[var(--color-text)] list-disc pl-5 space-y-1">
-                <li>Mermaid 必须使用 <code className="font-mono">```mermaid</code> 围栏代码块，普通代码块不会渲染图表。</li>
-                <li>图表语法错误时会退回代码块展示，便于定位具体出错行。</li>
-                <li>主题切换时会重新渲染图表，建议避免在超大图表中频繁切换主题。</li>
-              </ul>
-            </Section>
-          </div>
-        ),
-      },
-      {
-        id: 'alert',
-        label: '提示块 Alert',
-        keywords: ['alert', '提示块', 'note', 'warning', 'tip'],
-        render: () => (
-          <div>
-            <Section id="alert-support" title="支持范围">
-              <p className="text-sm text-[var(--color-text)] leading-relaxed">
-                支持 GitHub 风格提示块语法（需写在引用块内）：
-                <code className="font-mono ml-1">&gt; [!NOTE|TIP|IMPORTANT|WARNING|CAUTION]</code>
-              </p>
-            </Section>
-
-            <SideBySideExample
-              id="alert-basic-example"
-              title="Alert 示例"
-              code={alertExample}
-              preview={<MarkdownPreview content={alertExample} />}
-            />
-            <SideBySideExample
-              id="alert-advanced-example"
-              title="多行与列表 Alert"
-              description="支持在 Alert 内部继续使用空行、列表与行内代码。"
-              code={alertAdvancedExample}
-              preview={<MarkdownPreview content={alertAdvancedExample} />}
-            />
-
-            <Section id="alert-rules" title="书写规范">
-              <ul className="text-sm text-[var(--color-text)] list-disc pl-5 space-y-1">
-                <li>Alert 标记必须写在引用块首行：<code className="font-mono">&gt; [!TYPE]</code>。</li>
-                <li>同一 Alert 内每一行都需保持 <code className="font-mono">&gt;</code> 前缀，空行也不例外。</li>
-                <li>支持类型：<code className="font-mono">NOTE / TIP / IMPORTANT / WARNING / CAUTION</code>。</li>
-              </ul>
-            </Section>
-          </div>
-        ),
-      },
-      {
-        id: 'roadmap',
-        label: 'Roadmap 任务',
-        keywords: ['roadmap', '任务', '规划', '截止', '完成', 'priority', '描述', '详情'],
-        render: () => (
-          <div>
-            <Section id="roadmap-support" title="渲染规则（仅 roadmap 类型预览生效）">
-              <ul className="text-sm text-[var(--color-text)] list-disc pl-5 space-y-1">
-                <li>任务行：<code className="font-mono">- [ ]</code>（todo） / <code className="font-mono">- [-]</code>（in progress） / <code className="font-mono">- [x]</code>（done）</li>
-                <li>优先级（可选）：行末 <code className="font-mono">`high|medium|low`</code></li>
-                <li>描述与详情：缩进（至少 2 个空格）行会被视为任务内容；支持 <code className="font-mono">描述:</code> 与 <code className="font-mono">详情:</code> 标签。</li>
-                <li>字段行：<code className="font-mono">截止: ...</code>、<code className="font-mono">完成: ...</code></li>
-                <li>正文中的“任务列表”标题（如 <code className="font-mono">## 任务列表</code>）会自动从正文区移除，避免重复展示。</li>
-                <li>不符合任务格式的内容会保留为正文 Markdown 渲染</li>
-              </ul>
-            </Section>
-
-            <SideBySideExample
-              title="任务语法示例"
-              id="roadmap-example"
-              code={roadmapBodyExample}
-	              preview={
-	                <div className="max-h-[520px] overflow-auto">
-	                  <RoadmapPreview
-	                    fileName="roadmap-help.md"
-	                    metadata={{ title: '示例规划', description: '任务项解析示例', status: 'active' } as RoadmapMetadata}
-	                    content={roadmapBodyExample}
-	                    embedded
-	                  />
-	                </div>
-	              }
-	              previewTitle="渲染效果（RoadmapPreview）"
-	            />
-
-            <Section id="roadmap-fallback" title="解析细节与回退行为">
-              <ul className="text-sm text-[var(--color-text)] list-disc pl-5 space-y-1">
-                <li>任务优先级不写时默认 <code className="font-mono">medium</code>，仅支持 <code className="font-mono">high/medium/low</code>。</li>
-                <li>只有缩进行（2 空格或 Tab）才会归属到当前任务描述；未缩进行会被视为普通正文。</li>
-                <li><code className="font-mono">截止:</code>、<code className="font-mono">完成:</code> 只在任务缩进内生效，其他位置会按普通文本渲染。</li>
-                <li><code className="font-mono">详情:</code> 后续的缩进行会归入任务详情，适合写多行说明或列表。</li>
-                <li>当正文已解析出任务项时，独立的“任务列表”标题会自动清理，正文区仅保留非任务说明。</li>
-                <li>无法匹配任务格式的内容不会丢失，会保留到正文区域继续 Markdown 渲染。</li>
-              </ul>
-            </Section>
-          </div>
-        ),
-      },
-      {
-        id: 'graph',
-        label: 'Graph 图谱',
-        keywords: ['graph', '图谱', 'nodes', 'edges', 'json'],
-        render: () => (
-          <div>
-            <Section id="graph-support" title="渲染规则（仅 graph 类型预览生效）">
-              <ul className="text-sm text-[var(--color-text)] list-disc pl-5 space-y-1">
-                <li>使用 <code className="font-mono">```graph</code> 代码块写 JSON（nodes/edges）</li>
-                <li>graph 代码块会被解析为交互式图谱，其他正文仍按 Markdown 渲染</li>
-                <li>节点颜色：<code className="font-mono">default/red/orange/yellow/green/blue/purple/pink</code></li>
-                <li>连线颜色：由源节点 <code className="font-mono">data.edgeColor</code> 控制（<code className="font-mono">default</code> 或 <code className="font-mono">p0~p9</code>）</li>
-              </ul>
-            </Section>
-
-            <SideBySideExample
-              title="graph 代码块示例"
-              id="graph-example"
-              code={graphBodyExample}
-	              preview={
-	                <div className="h-[680px] overflow-hidden">
-	                  <GraphPreview
-	                    fileName="graph-help.md"
-	                    metadata={{ name: '示例图谱', description: 'graph 代码块解析示例', date: '2026-02-05' } as GraphMetadata}
-	                    content={graphBodyExample}
-	                    embedded
-	                  />
-	                </div>
-	              }
-	              previewTitle="渲染效果（GraphPreview）"
-	            />
-
-            <Section id="graph-schema" title="JSON 字段速查">
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
-                <CodeCard title="graph JSON 示例" code={graphSchemaExample} />
-                <PreviewCard title="字段说明">
-                  <ul className="text-sm text-[var(--color-text)] list-disc pl-5 space-y-1">
-                    <li><code className="font-mono">nodes[].id</code> 与 <code className="font-mono">edges[].id</code> 建议全局唯一。</li>
-                    <li><code className="font-mono">position</code> 使用画布坐标，单位为像素。</li>
-                    <li><code className="font-mono">data.label</code> 为节点显示文本，<code className="font-mono">data.tags</code> 用于标签展示。</li>
-                    <li>连线颜色由源节点 <code className="font-mono">data.edgeColor</code> 控制，而非 edge 自身字段。</li>
-                  </ul>
-                </PreviewCard>
-              </div>
-            </Section>
-
-            <Section id="graph-faq" title="常见问题">
-              <ul className="text-sm text-[var(--color-text)] list-disc pl-5 space-y-1">
-                <li>正文中仅提取第一个 <code className="font-mono">```graph</code> 代码块，其余 graph 代码块会按普通正文保留。</li>
-                <li>graph 代码块 JSON 解析失败时会回退为空图（0 nodes / 0 edges），正文内容仍保留。</li>
-                <li>graph 区域外的正文仍使用 Markdown 渲染，可用于补充说明与引用资料。</li>
-              </ul>
-            </Section>
-          </div>
-        ),
-      },
-      {
-        id: 'frontmatter',
-        label: 'Frontmatter 元数据',
-        keywords: ['frontmatter', 'yaml', '元数据', 'metadata', '示例', '写作', '指南'],
-        render: () => <FrontmatterHelpTab />,
-      },
-    ];
-  }, []);
-
-  const keyword = searchKeyword.trim().toLowerCase();
-
-  const filteredTabs = useMemo(() => {
-    if (!keyword) return tabs;
-    return tabs.filter((item) => [item.label, ...item.keywords].join(' ').toLowerCase().includes(keyword));
-  }, [tabs, keyword]);
-
   useEffect(() => {
-    if (filteredTabs.length === 0) return;
-    const hasCurrent = filteredTabs.some((item) => item.id === tab);
-    if (!hasCurrent) {
-      setTab(filteredTabs[0].id);
-    }
-  }, [filteredTabs, tab]);
+    if (!filteredTabs.length) return;
+    if (filteredTabs.some((tab) => tab.id === activeId)) return;
+    setActiveId(filteredTabs[0].id);
+  }, [filteredTabs, activeId]);
 
   useEffect(() => {
     if (!open) return;
-    contentRef.current?.scrollTo({ top: 0, behavior: 'auto' });
-  }, [open, tab]);
-
-  const active = filteredTabs.find((t) => t.id === tab) ?? filteredTabs[0] ?? null;
-  const sectionLinks = active ? tabSectionMap[active.id] ?? [] : [];
-
-  const scrollToSection = (sectionId: string) => {
-    const target = contentRef.current?.querySelector<HTMLElement>(`#${sectionId}`);
-    target?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-  };
+    contentRef.current?.scrollTo({ top: 0, behavior: "auto" });
+  }, [open, activeId]);
 
   if (!open) return null;
 
+  const scrollToSection = (sectionId: string) => {
+    const container = contentRef.current;
+    const target = container?.querySelector<HTMLElement>(`#${sectionId}`);
+    if (!container || !target) return;
+
+    const containerTop = container.getBoundingClientRect().top;
+    const targetTop = target.getBoundingClientRect().top;
+    const nextTop =
+      container.scrollTop +
+      targetTop -
+      containerTop -
+      SECTION_SCROLL_GAP;
+
+    container.scrollTo({ top: Math.max(0, nextTop), behavior: "smooth" });
+  };
+
   return (
     <div className="fixed inset-0 z-40">
-      {/* 遮罩 */}
-      <div
-        className="absolute inset-0 bg-black/50"
-        onClick={onClose}
-        aria-hidden="true"
-      />
-
-      {/* 面板 */}
+      <div className="absolute inset-0 bg-black/50" onClick={onClose} aria-hidden="true" />
       <div className="absolute inset-0 flex items-center justify-center p-4">
-        <div className="w-full max-w-5xl h-[85vh] bg-[var(--color-paper)] border border-[var(--color-border)] rounded-xl shadow-2xl overflow-hidden">
-          {/* Header */}
-          <div className="h-12 px-4 border-b border-[var(--color-border)] flex items-center gap-3">
-            <div className="flex items-center gap-2 text-sm font-medium text-[var(--color-text)]">
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 10h.01M12 14h.01M16 10h.01M9 16h6M12 3a9 9 0 100 18 9 9 0 000-18z" />
-              </svg>
-              渲染帮助
-            </div>
-            <div className="flex-1" />
-            <button
-              onClick={onClose}
-              className="px-2 py-1 text-sm text-[var(--color-text-muted)] hover:text-[var(--color-text)] hover:bg-[var(--color-surface)] rounded-md transition-colors"
-              title="关闭 (Esc)"
-              aria-label="关闭帮助面板"
-            >
-              关闭
-            </button>
-          </div>
-
-          {/* Tabs */}
-          <div className="px-3 py-2 border-b border-[var(--color-border)] bg-[var(--color-surface)]">
-            <div className="flex flex-col gap-2">
-              <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
-                <label className="relative flex-1">
-                  <span className="sr-only">搜索语法分类</span>
-                  <input
-                    type="text"
-                    value={searchKeyword}
-                    onChange={(event) => setSearchKeyword(event.target.value)}
-                    placeholder="搜索分类或关键字（如：mermaid、frontmatter、公式）"
-                    className="w-full h-9 rounded-md border border-[var(--color-border)] bg-[var(--color-paper)] px-3 pr-16 text-sm text-[var(--color-text)] placeholder:text-[var(--color-text-muted)] focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)]/30"
-                  />
-                  {searchKeyword && (
-                    <button
-                      onClick={() => setSearchKeyword('')}
-                      className="absolute right-1 top-1/2 -translate-y-1/2 px-2 py-1 text-xs text-[var(--color-text-muted)] hover:text-[var(--color-text)] hover:bg-[var(--color-surface)] rounded"
-                      type="button"
-                    >
-                      清空
-                    </button>
-                  )}
-                </label>
-                <span className="text-xs text-[var(--color-text-muted)]">
-                  分类 {filteredTabs.length} / {tabs.length}
-                </span>
-              </div>
-
-              {filteredTabs.length === 0 ? (
-                <div className="text-sm text-[var(--color-text-muted)] py-2">
-                  未找到匹配分类，请尝试其他关键字。
-                </div>
-              ) : (
-                <div className="flex flex-wrap gap-2">
-                  {filteredTabs.map((t) => {
-                    const isActive = t.id === tab;
-                    return (
-                      <button
-                        key={t.id}
-                        onClick={() => setTab(t.id)}
-                        className={`px-3 py-1.5 text-sm rounded-md transition-colors border ${
-                          isActive
-                            ? 'bg-[var(--color-paper)] text-[var(--color-text)] border-[var(--color-border)]'
-                            : 'bg-transparent text-[var(--color-text-muted)] border-transparent hover:bg-[var(--color-paper)] hover:border-[var(--color-border)] hover:text-[var(--color-text)]'
-                        }`}
-                      >
-                        {t.label}
-                      </button>
-                    );
-                  })}
-                </div>
-              )}
-            </div>
-          </div>
-
-          {/* Content */}
-          <div className="h-[calc(85vh-8.75rem)] grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_230px]">
-            <div ref={contentRef} className="overflow-y-auto p-4">
-              {active ? (
-                active.render()
-              ) : (
-                <div className="h-full flex items-center justify-center text-sm text-[var(--color-text-muted)]">
-                  当前筛选没有可展示的帮助内容。
-                </div>
-              )}
-            </div>
-
-            <aside className="hidden lg:flex lg:flex-col border-l border-[var(--color-border)] bg-[var(--color-surface)]">
-              <div className="px-3 py-2 text-xs font-medium text-[var(--color-text-muted)] border-b border-[var(--color-border)]">
-                当前目录
-              </div>
-              <div className="p-2 overflow-y-auto space-y-1">
-                {sectionLinks.length === 0 ? (
-                  <div className="px-2 py-1 text-xs text-[var(--color-text-muted)]">
-                    无可跳转章节
-                  </div>
-                ) : (
-                  sectionLinks.map((section) => (
-                    <button
-                      key={section.id}
-                      type="button"
-                      onClick={() => scrollToSection(section.id)}
-                      className="w-full text-left px-2 py-1.5 text-xs rounded-md text-[var(--color-text-muted)] hover:text-[var(--color-text)] hover:bg-[var(--color-paper)] transition-colors"
-                    >
-                      {section.title}
-                    </button>
-                  ))
-                )}
-              </div>
-            </aside>
+        <div className="w-full max-w-5xl h-[85vh] max-h-[85vh] min-h-0 flex flex-col overflow-hidden rounded-xl border border-[var(--color-border)] bg-[var(--color-paper)] shadow-2xl">
+          <HelpModalHeader onClose={onClose} />
+          <div className="min-h-0 flex flex-1 flex-col lg:grid lg:grid-cols-[300px_minmax(0,1fr)]">
+            <HelpModalSidebar
+              keyword={searchKeyword}
+              total={HELP_MODAL_TABS.length}
+              filteredCount={filteredTabs.length}
+              groupedTabs={groupedTabs}
+              activeId={activeTab?.id ?? null}
+              onChange={setSearchKeyword}
+              onClear={() => setSearchKeyword("")}
+              onSelect={setActiveId}
+            />
+            <HelpModalActivePanel
+              activeTab={activeTab}
+              contentRef={contentRef}
+              summaryRef={summaryRef}
+              onScrollToSection={scrollToSection}
+            />
           </div>
         </div>
       </div>

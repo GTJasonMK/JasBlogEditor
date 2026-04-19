@@ -83,17 +83,16 @@ export function detectApiFormat(modelName: string): APIFormat {
 
 // ===== 浏览器请求头 =====
 
-/** 模拟浏览器请求头，用于绕过部分中转站的 Cloudflare 检测 */
+/**
+ * 模拟浏览器请求头。
+ *
+ * 这里只保留 fetch 规范允许脚本设置、且对常见中转站判别有帮助的字段。
+ * `User-Agent`、`Accept-Encoding`、`Connection`、`Sec-Fetch-*` 等 forbidden
+ * headers 在浏览器和 tauri-plugin-http 下都会被拦截或跳过，继续传只会产生噪音警告。
+ */
 export function getBrowserHeaders(): Record<string, string> {
   return {
-    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36',
     'Accept': 'application/json, text/plain, */*',
     'Accept-Language': 'zh-CN,zh;q=0.9,en;q=0.8',
-    'Accept-Encoding': 'gzip, deflate, br',
-    'DNT': '1',
-    'Connection': 'keep-alive',
-    'Sec-Fetch-Dest': 'empty',
-    'Sec-Fetch-Mode': 'cors',
-    'Sec-Fetch-Site': 'same-origin',
   };
 }

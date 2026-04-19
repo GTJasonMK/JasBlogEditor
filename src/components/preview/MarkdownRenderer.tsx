@@ -19,6 +19,17 @@ function preprocessAlerts(content: string): string {
   );
 }
 
+export interface MarkdownLinkProps {
+  href?: string;
+  children?: ReactNode;
+  [key: string]: unknown;
+}
+
+export type MarkdownLinkRenderer = (
+  props: MarkdownLinkProps,
+  renderDefaultLink: (props: MarkdownLinkProps) => ReactNode
+) => ReactNode;
+
 // 代码块复制按钮组件
 function CopyButton({ code }: { code: string }) {
   const [copied, setCopied] = useState(false);
@@ -57,9 +68,9 @@ function CopyButton({ code }: { code: string }) {
         color: "#cdd6f4",
         border: "1px solid rgba(255,255,255,0.15)",
       }}
-      aria-label="Copy code"
+      aria-label="复制代码"
     >
-      {copied ? "Copied" : "Copy"}
+      {copied ? "已复制" : "复制"}
     </button>
   );
 }
@@ -164,27 +175,27 @@ const ALERT_CONFIG: Record<
   { label: string; className: string; icon: string }
 > = {
   note: {
-    label: "Note",
+    label: "提示",
     className: "alert-note",
     icon: "M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-6h2v6zm0-8h-2V7h2v2z",
   },
   tip: {
-    label: "Tip",
+    label: "技巧",
     className: "alert-tip",
     icon: "M9 21c0 .55.45 1 1 1h4c.55 0 1-.45 1-1v-1H9v1zm3-19C8.14 2 5 5.14 5 9c0 2.38 1.19 4.47 3 5.74V17c0 .55.45 1 1 1h6c.55 0 1-.45 1-1v-2.26c1.81-1.27 3-3.36 3-5.74 0-3.86-3.14-7-7-7z",
   },
   important: {
-    label: "Important",
+    label: "重要",
     className: "alert-important",
     icon: "M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 15v-2h2v2h-2zm0-4V7h2v6h-2z",
   },
   warning: {
-    label: "Warning",
+    label: "警告",
     className: "alert-warning",
     icon: "M1 21h22L12 2 1 21zm12-3h-2v-2h2v2zm0-4h-2v-4h2v4z",
   },
   caution: {
-    label: "Caution",
+    label: "注意",
     className: "alert-caution",
     icon: "M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.42 0-8-3.58-8-8s3.58-8 8-8 8 3.58 8 8-3.58 8-8 8zm3.54-12.46L12 11.08 8.46 7.54 7.04 8.96 10.58 12.5l-3.54 3.54 1.42 1.42L12 13.92l3.54 3.54 1.42-1.42L13.42 12.5l3.54-3.54-1.42-1.42z",
   },
@@ -211,7 +222,7 @@ function Heading({
       <a
         href={`#${headingId}`}
         className="heading-anchor"
-        aria-label={`Link to ${text}`}
+        aria-label={`定位到 ${text}`}
         onClick={(e) => {
           e.preventDefault();
           // 优先滚动当前标题元素，避免页面上存在同名 id 时跳错位置
@@ -266,9 +277,25 @@ function CodeBlock({ children }: { children?: ReactNode }) {
 
 interface MarkdownRendererProps {
   content: string;
+  renderLink?: MarkdownLinkRenderer;
 }
 
-export function MarkdownRenderer({ content }: MarkdownRendererProps) {
+function renderDefaultMarkdownLink({ href, children, ...props }: MarkdownLinkProps) {
+  const isExternal = href?.startsWith("http");
+
+  return (
+    <a
+      href={href}
+      target={isExternal ? "_blank" : undefined}
+      rel={isExternal ? "noopener noreferrer" : undefined}
+      {...props}
+    >
+      {children}
+    </a>
+  );
+}
+
+export function MarkdownRenderer({ content, renderLink }: MarkdownRendererProps) {
   const processed = preprocessAlerts(content);
   const headingIdCounts = new Map<string, number>();
   const resolveHeadingId = (text: string): string => {
@@ -307,17 +334,10 @@ export function MarkdownRenderer({ content }: MarkdownRendererProps) {
         ),
         // 链接
         a: ({ href, children, ...props }) => {
-          const isExternal = href?.startsWith("http");
-          return (
-            <a
-              href={href}
-              target={isExternal ? "_blank" : undefined}
-              rel={isExternal ? "noopener noreferrer" : undefined}
-              {...props}
-            >
-              {children}
-            </a>
-          );
+          const linkProps: MarkdownLinkProps = { href, children, ...props };
+          return renderLink
+            ? renderLink(linkProps, renderDefaultMarkdownLink)
+            : renderDefaultMarkdownLink(linkProps);
         },
         // 图片（可缩放）
         img: ({ src, alt, width, height }) => {
